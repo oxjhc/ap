@@ -1,0 +1,28 @@
+message ProofReq {
+	required int64 uid = 1;
+	required bytes unonce = 2;
+	required int64 seqid = 3;
+	required bytes verif_pubkey = 4;
+	required bytes sig = 5;
+}
+
+message ProofResp {
+	required int64 uid = 1;
+	required bytes unonce = 3;
+	required bytes sig = 3;
+}
+
+message LocnProof {
+	required bytes vault_key = 1;
+	required int64 uid = 2;
+	required bytes unonce = 3;
+	required int64 apid = 4;
+	required bytes apnonce = 5;
+	required fixed64 time = 6;
+	required bytes sig = 7;
+}
+
+message Token {
+	required bytes vnonce = 1;
+	required bytes locn_tag = 2;
+}
