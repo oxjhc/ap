@@ -1,22 +1,39 @@
 message ProofReq {
-	required int64 uid = 1;
+	required bytes uid = 1;
 	required bytes unonce = 2;
 	required int64 seqid = 3;
-	required bytes verif_pubkey = 4;
+	required bytes vid = 4;
 	required bytes sig = 5;
 }
 
 message ProofResp {
-	required int64 uid = 1;
+	required bytes uid = 1;
 	required bytes unonce = 3;
 	required bytes sig = 3;
 }
 
+message VaultMsg {
+	message Vault {
+		message Point {
+			required uint32 x = 1;
+			required uint32 y = 1;
+		}
+		repeated Point points = 1;
+	}
+	required Vault vault = 1;
+	required bytes uid = 2;
+	required bytes unonce = 3;
+	required bytes apid = 4;
+	required bytes apnonce = 5;
+	required fixed64 time = 6;
+	required bytes sig = 7;
+}
+
 message LocnProof {
 	required bytes vault_key = 1;
-	required int64 uid = 2;
+	required bytes uid = 2;
 	required bytes unonce = 3;
-	required int64 apid = 4;
+	required bytes apid = 4;
 	required bytes apnonce = 5;
 	required fixed64 time = 6;
 	required bytes sig = 7;
