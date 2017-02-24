@@ -1,3 +1,5 @@
+syntax = "proto2";
+
 message ProofReq {
 	required bytes uid = 1;
 	required bytes unonce = 2;
@@ -8,7 +10,7 @@ message ProofReq {
 
 message ProofResp {
 	required bytes uid = 1;
-	required bytes unonce = 3;
+	required bytes unonce = 2;
 	required bytes sig = 3;
 }
 
@@ -16,7 +18,7 @@ message VaultMsg {
 	message Vault {
 		message Point {
 			required uint32 x = 1;
-			required uint32 y = 1;
+			required uint32 y = 2;
 		}
 		repeated Point points = 1;
 	}
