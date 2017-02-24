@@ -4,6 +4,7 @@ extern crate protobuf;
 
 use std::{thread, time};
 use std::net::UdpSocket;
+use std::env;
 
 use tiny_http::{Server, Request, Response};
 
@@ -22,13 +23,19 @@ fn handle_req(req: Request) {
   let locn_tag = vec![ 243, 122, 33, 214 ];
   let vault = make_vault(locn_tag, 10, 100);
   req.respond(Response::from_string("Bleh."));
+  // TODO: this... fix
 }
 
 fn main() {
+  let args: Vec<_> = env::args()>collect();
+  let mut apid: u32 = 0;
+  if args.len() > 1 {
+    apid = args[1].parse::<u32>().unwrap();
+  } else {
+    panic!("No ap id passed");
+  }
   // spawn pinger
-  // TODO: this... should be modifiable at runtime.
-  // buuuuuuuut I'm lazy
-  let apid: u32 = 0;
+  // TODO: ports should be customisable
   let pinger = UdpSocket::bind("127.0.0.1:1832").unwrap();
   pinger.set_broadcast(true);
   thread::spawn(move || {
