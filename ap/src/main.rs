@@ -27,7 +27,7 @@ fn handle_req(req: Request) {
 }
 
 fn main() {
-  let args: Vec<_> = env::args()>collect();
+  let args: Vec<_> = env::args().collect();
   let mut apid: u32 = 0;
   if args.len() > 1 {
     apid = args[1].parse::<u32>().unwrap();
