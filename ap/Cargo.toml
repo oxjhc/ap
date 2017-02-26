@@ -2,7 +2,7 @@
 name = "ap"
 version = "0.1.0"
 authors = [ "Sauyon Lee <s@uyon.co>", "Samuel Hindmarch <samuel.hindmarch@stcatz.ox.ac.uk" ]
-#build = "build.rs"
+build = "build.rs"
 
 [dependencies]
 rand = "0.3"
