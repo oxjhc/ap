@@ -4,4 +4,4 @@
 /ap/src/messages.rs
 
 # Stack tool hidden directory
-/server/.stack-work/
+.stack-work/
