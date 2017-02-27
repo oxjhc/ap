@@ -2,3 +2,6 @@
 /ap/target/
 # Generated Protobuf files
 /ap/src/messages.rs
+
+# Stack tool hidden directory
+/server/.stack-work/
