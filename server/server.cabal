@@ -16,12 +16,16 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   exposed-modules:     Lib
+                     , ProtoBuf
+  other-modules:       Data.ProtocolBuffers.PrettyPrinter
   build-depends:       base >= 4.7 && < 5
                      , aeson
                      , protobuf
                      , text
                      , bytestring
                      , cereal
+                     , type-level
+                     , pretty
                      , http-media
                      , hex
                      , servant-server
