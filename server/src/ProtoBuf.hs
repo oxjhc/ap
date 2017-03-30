@@ -40,14 +40,14 @@ message VaultMsg {
 data Point = Point
   { x :: Required 1 (Value Word32)
   , y :: Required 2 (Value Word32)
-  } deriving (Generic, Show)
+  } deriving (Generic, Show, Eq)
 
 instance Encode Point
 instance Decode Point
 
 data Vault = Vault
   { points :: Repeated 1 (Message Point)
-  } deriving (Generic, Show)
+  } deriving (Generic, Show, Eq)
 
 instance Encode Vault
 instance Decode Vault
@@ -60,7 +60,7 @@ data VaultMsg = VaultMsg
   , apnonce :: Required 5 (Value Text)
   , time    :: Required 6 (Value (Fixed Word64))
   , sig     :: Required 7 (Value Text)
-  } deriving (Generic, Show)
+  } deriving (Generic, Show, Eq)
 
 instance Encode VaultMsg
 instance Decode VaultMsg
@@ -85,10 +85,25 @@ data LocnProof = LocnProof
   , apnonce   :: Required 5 (Value Text)
   , time      :: Required 6 (Value (Fixed Word64))
   , sig       :: Required 7 (Value Text)
-  } deriving (Generic, Show)
+  } deriving (Generic, Show, Eq)
 
 instance Encode LocnProof
 instance Decode LocnProof
+
+{-
+message Token {
+	required bytes vnonce = 1;
+	required bytes locn_tag = 2;
+}
+-}
+
+data Token = Token
+  { vnonce   :: Required 1 (Value Text)
+  , locn_tag :: Required 2 (Value Text)
+  } deriving (Generic, Show, Eq)
+
+instance Encode Token
+instance Decode Token
 
 data ProtoBuf
 
