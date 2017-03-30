@@ -17,6 +17,8 @@ library
   hs-source-dirs:      src
   exposed-modules:     Lib
                      , ProtoBuf
+                     , Vault
+                     , Number
   other-modules:       Data.ProtocolBuffers.PrettyPrinter
   build-depends:       base >= 4.7 && < 5
                      , aeson
