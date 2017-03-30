@@ -1,0 +1,7 @@
+# AP Build files
+/ap/target/
+# Generated Protobuf files
+/ap/src/messages.rs
+
+# Stack tool hidden directory
+.stack-work/
