@@ -39,7 +39,7 @@ server = checkProof
     newLine = putStr "\n"
     checkProof :: LocnProof -> Handler Token
     checkProof prf = do
-      liftIO (putStrLn "Checking proof." >> print prf >> newLine)
+      liftIO (putStrLn "Checking proof." >> print (showProto prf) >> newLine)
       if prf == proof then
         return token
       else
@@ -51,8 +51,8 @@ server = checkProof
           }
     receiveVaultMsg :: VaultMsg -> Handler String
     receiveVaultMsg msg = do
-      liftIO (putStrLn "Received message." >> print msg >> newLine)
-      return (show msg)
+      liftIO (putStrLn "Received message." >> print (showProto msg) >> newLine)
+      return (show (showProto msg))
 
 -- Serializes to: 0A036B65791204313233341A01782204353637382A01793140000000000000003A026D65
 proof :: LocnProof

@@ -7,16 +7,17 @@
 
 module ProtoBuf where
 
-import           Data.ByteString.Lazy
+import           Data.Binary.Builder.Sized
+import           Data.Binary.Get
 import           Data.Hex
 import           Data.Int
 import           Data.ProtocolBuffers
 import           Data.Serialize
 import           Data.Text
 import           Data.Word
-import           GHC.Generics         (Generic)
+import           GHC.Generics              (Generic)
 import           Network.HTTP.Media
-import           Servant              hiding (Vault)
+import           Servant                   hiding (Vault)
 
 {-
 message VaultMsg {
@@ -110,6 +111,9 @@ data ProtoBuf
 instance Servant.Accept ProtoBuf where
   contentType _ = "application" // "x-protobuf"
 instance Encode a => MimeRender ProtoBuf a where
-  mimeRender _ = fromStrict . fmap hex runPut . encodeMessage
+  mimeRender _ = fmap hex toLazyByteString . encodeMessage
 instance Decode a => MimeUnrender ProtoBuf a where
-  mimeUnrender _ bs = runGet decodeMessage =<< unhex (toStrict bs)
+  mimeUnrender _ bs =
+    case runGetOrFail decodeMessage =<< unhex bs of
+      Left (_, _, err)  -> Left err
+      Right (_, _, res) -> Right res

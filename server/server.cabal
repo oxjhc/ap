@@ -22,7 +22,7 @@ library
   other-modules:       Data.ProtocolBuffers.PrettyPrinter
   build-depends:       base >= 4.7 && < 5
                      , aeson
-                     , protobuf
+                     , protobuf == 0.3.0.0
                      , text
                      , bytestring
                      , cereal
@@ -33,6 +33,8 @@ library
                      , servant-server
                      , wai
                      , warp
+                     , containers
+                     , binary
   default-language:    Haskell2010
 
 executable server-exe
