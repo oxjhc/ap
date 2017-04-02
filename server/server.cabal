@@ -19,10 +19,10 @@ library
                      , ProtoBuf
                      , Vault
                      , Number
-  other-modules:       Data.ProtocolBuffers.PrettyPrinter
+  other-modules:       ProtoBufConverter
   build-depends:       base >= 4.7 && < 5
                      , aeson
-                     , protobuf
+                     , protobuf == 0.3.0.0
                      , text
                      , bytestring
                      , cereal
@@ -35,6 +35,7 @@ library
                      , warp
                      , containers
                      , unordered-containers
+                     , binary
   default-language:    Haskell2010
 
 executable server-exe
