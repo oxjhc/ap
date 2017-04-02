@@ -1,27 +1,41 @@
+{-# LANGUAGE AllowAmbiguousTypes   #-}
 {-# LANGUAGE DataKinds             #-}
 {-# LANGUAGE DeriveGeneric         #-}
 {-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TypeApplications      #-}
 
 module ProtoBuf where
 
-import           Data.ByteString.Lazy      (fromStrict, toStrict)
 import           Data.Binary.Builder.Sized
 import           Data.Binary.Get
+import           Data.ByteString               (ByteString)
+import           Data.ByteString.Lazy          (fromStrict, toStrict)
+import           Data.HashMap.Strict           (HashMap)
 import           Data.Hex
 import           Data.Int
 import           Data.ProtocolBuffers
-import           Data.Serialize            hiding (encode, decode)
-import           Data.ByteString           (ByteString) --Text would perform Unicode checks, so isn't suitable.
+import           Data.ProtocolBuffers.Internal (Tag, WireField)
+import           Data.Serialize                hiding (decode, encode)
 import           Data.Word
-import           GHC.Generics              (Generic)
+import           GHC.Generics                  (Generic)
 import           Network.HTTP.Media
-import           Servant                   hiding (Vault)
-import           ProtoBufConverter
 import           Number
+import           ProtoBufConverter
+import           Servant                       hiding (Vault)
 import           Vault
+
+-- Useful for defining the Encode and Decode instances
+encodeGen :: forall a b. (ProtoIso a b, Encode a) => b -> Builder
+encodeGen = encode @a . toProto @a @b
+
+decodeGen :: forall a b. (ProtoIso a b, Decode a) =>
+  HashMap Tag [WireField] -> Data.Binary.Get.Get b
+decodeGen = fmap (fromProto @a @b). decode @a
 
 {-
 message VaultMsg {
@@ -86,8 +100,8 @@ data VaultMsg = VaultMsg
 instance Encode VaultMsg'
 instance Decode VaultMsg'
 
-instance Encode VaultMsg where encode = encodeGen (undefined :: VaultMsg')
-instance Decode VaultMsg where decode = decodeGen (undefined :: VaultMsg')
+instance Encode VaultMsg where encode = encodeGen @VaultMsg' @VaultMsg
+instance Decode VaultMsg where decode = decodeGen @VaultMsg' @VaultMsg
 
 {-
 message LocnProof {
@@ -124,8 +138,8 @@ data LocnProof = LocnProof
 instance Encode LocnProof'
 instance Decode LocnProof'
 
-instance Encode LocnProof where encode = encodeGen (undefined :: LocnProof')
-instance Decode LocnProof where decode = decodeGen (undefined :: LocnProof')
+instance Encode LocnProof where encode = encodeGen @LocnProof' @LocnProof
+instance Decode LocnProof where decode = decodeGen @LocnProof' @LocnProof
 
 {-
 message Token {
@@ -147,8 +161,8 @@ data Token = Token
 instance Encode Token'
 instance Decode Token'
 
-instance Encode Token where encode = encodeGen (undefined :: Token')
-instance Decode Token where decode = decodeGen (undefined :: Token')
+instance Encode Token where encode = encodeGen @Token' @Token
+instance Decode Token where decode = decodeGen @Token' @Token
 
 data ProtoBuf
 
