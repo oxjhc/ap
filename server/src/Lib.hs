@@ -22,6 +22,7 @@ type API =
        "proof" :> ReqBody '[ProtoBuf] LocnProof :> Post '[ProtoBuf] Token
        -- Receive a VaultMsg, printing it out for now.
   :<|> "vault" :> ReqBody '[ProtoBuf] VaultMsg :> Post '[PlainText] String
+  :<|> "test" :> Get '[PlainText] String
 
 startApp :: IO ()
 startApp = run 8080 app
@@ -35,6 +36,7 @@ api = Proxy
 server :: Server API
 server = checkProof
     :<|> receiveVaultMsg
+    :<|> return "Success!"
   where
     newLine = putStr "\n"
     checkProof :: LocnProof -> Handler Token
@@ -43,11 +45,11 @@ server = checkProof
       if prf == proof then
         return token
       else
-        throwError (err404 {errBody = "Invalid proof."})
+        throwError (err400 {errBody = "Invalid proof."})
       where
         token = Token
-          { vnonce = putField "abcd"
-          , locn_tag = putField "efgh"
+          { vnonce = "abcd"
+          , locn_tag = "efgh"
           }
     receiveVaultMsg :: VaultMsg -> Handler String
     receiveVaultMsg msg = do
@@ -57,11 +59,11 @@ server = checkProof
 -- Serializes to: 0A036B65791204313233341A01782204353637382A01793140000000000000003A026D65
 proof :: LocnProof
 proof = LocnProof
-  { vault_key = putField "key"
-  , uid = putField "1234"
-  , unonce = putField "x"
-  , apid = putField "5678"
-  , apnonce = putField "y"
-  , time = putField 64
-  , sig = putField "me"
+  { vault_key = "key"
+  , uid = "1234"
+  , unonce = "x"
+  , apid = "5678"
+  , apnonce = "y"
+  , time = 64
+  , sig = "me"
   }

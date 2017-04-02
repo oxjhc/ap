@@ -1,10 +1,14 @@
+{-# LANGUAGE DeriveGeneric         #-}
+
 module Vault(
+    Vault(..)
 ) where
 
 import qualified Data.Set as Set
 import Data.List
+import GHC.Generics (Generic)
 
-newtype Vault n = Vault [(n, n)]
+newtype Vault n = Vault [(n, n)] deriving (Eq, Show, Generic)
 newtype Polynomial n = P{unPoly :: [n]}
 
 poly :: n -> Polynomial n

@@ -1,4 +1,5 @@
 module Number(
+    PrimeField
 ) where
 
 import Data.Ratio
@@ -34,3 +35,7 @@ bézout x y -- = (u, a, b) where u = a*x + b*y, assuming x > y
 instance Show PrimeField where
     show (PF n) = show $ mod (n+o) p - o
         where o = div p 2
+
+instance Enum PrimeField where
+    fromEnum = unPF
+    toEnum   = PF . (flip mod p)

@@ -7,16 +7,19 @@
 
 module ProtoBuf where
 
-import           Data.ByteString.Lazy
+import           Data.ByteString.Lazy (fromStrict, toStrict)
 import           Data.Hex
 import           Data.Int
 import           Data.ProtocolBuffers
-import           Data.Serialize
-import           Data.Text
+import           Data.Serialize       hiding (encode, decode)
+import           Data.Text            (Text)
 import           Data.Word
 import           GHC.Generics         (Generic)
 import           Network.HTTP.Media
 import           Servant              hiding (Vault)
+import           ProtoBufConverter
+import           Number
+import           Vault
 
 {-
 message VaultMsg {
@@ -38,22 +41,28 @@ message VaultMsg {
 -}
 
 data Point = Point
-  { x :: Required 1 (Value Word32)
-  , y :: Required 2 (Value Word32)
+  { x :: Required 1 (Enumeration PrimeField)
+  , y :: Required 2 (Enumeration PrimeField)
   } deriving (Generic, Show, Eq)
 
 instance Encode Point
 instance Decode Point
 
-data Vault = Vault
+data Vault' = Vault'
   { points :: Repeated 1 (Message Point)
   } deriving (Generic, Show, Eq)
 
-instance Encode Vault
-instance Decode Vault
+instance Encode Vault'
+instance Decode Vault'
 
-data VaultMsg = VaultMsg
-  { vault   :: Required 1 (Message Vault)
+instance Encode (Vault PrimeField) where
+    encode (Vault ps) = encode $ Vault' $ putField $ flip map ps $ (\(x, y) -> Point (putField x) (putField y))
+instance Decode (Vault PrimeField) where
+    decode = fmap (Vault . map (\(Point x y) -> (getField x, getField y)) . getField . points) . decode
+
+
+data VaultMsg' = VaultMsg'
+  { vault   :: Required 1 (Message (Vault PrimeField))
   , uid     :: Required 2 (Value Text)
   , unonce  :: Required 3 (Value Text)
   , apid    :: Required 4 (Value Text)
@@ -62,8 +71,21 @@ data VaultMsg = VaultMsg
   , sig     :: Required 7 (Value Text)
   } deriving (Generic, Show, Eq)
 
-instance Encode VaultMsg
-instance Decode VaultMsg
+data VaultMsg = VaultMsg
+  { vault   :: Vault PrimeField
+  , uid     :: String
+  , unonce  :: String
+  , apid    :: String
+  , apnonce :: String
+  , time    :: Word64
+  , sig     :: String
+  } deriving (Generic, Show, Eq)
+
+instance Encode VaultMsg'
+instance Decode VaultMsg'
+
+instance Encode VaultMsg where encode = encodeGen (undefined :: VaultMsg')
+instance Decode VaultMsg where decode = decodeGen (undefined :: VaultMsg')
 
 {-
 message LocnProof {
@@ -77,7 +99,7 @@ message LocnProof {
 }
 -}
 
-data LocnProof = LocnProof
+data LocnProof' = LocnProof'
   { vault_key :: Required 1 (Value Text)
   , uid       :: Required 2 (Value Text)
   , unonce    :: Required 3 (Value Text)
@@ -87,8 +109,21 @@ data LocnProof = LocnProof
   , sig       :: Required 7 (Value Text)
   } deriving (Generic, Show, Eq)
 
-instance Encode LocnProof
-instance Decode LocnProof
+data LocnProof = LocnProof
+  { vault_key :: String
+  , uid       :: String
+  , unonce    :: String
+  , apid      :: String
+  , apnonce   :: String
+  , time      :: Word64
+  , sig       :: String
+  } deriving (Generic, Show, Eq)
+
+instance Encode LocnProof'
+instance Decode LocnProof'
+
+instance Encode LocnProof where encode = encodeGen (undefined :: LocnProof')
+instance Decode LocnProof where decode = decodeGen (undefined :: LocnProof')
 
 {-
 message Token {
@@ -97,13 +132,21 @@ message Token {
 }
 -}
 
-data Token = Token
+data Token' = Token'
   { vnonce   :: Required 1 (Value Text)
   , locn_tag :: Required 2 (Value Text)
   } deriving (Generic, Show, Eq)
 
-instance Encode Token
-instance Decode Token
+data Token = Token
+  { vnonce   :: String
+  , locn_tag :: String
+  } deriving (Generic, Show, Eq)
+
+instance Encode Token'
+instance Decode Token'
+
+instance Encode Token where encode = encodeGen (undefined :: Token')
+instance Decode Token where decode = decodeGen (undefined :: Token')
 
 data ProtoBuf
 
