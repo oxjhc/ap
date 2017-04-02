@@ -49,17 +49,17 @@ server = checkProof
       where
         token = Token
           { vnonce = "abcd"
-          , locn_tag = "efgh"
+          , locn_tag = 0
           }
     receiveVaultMsg :: VaultMsg -> Handler String
     receiveVaultMsg msg = do
       liftIO (putStrLn "Received message." >> print msg >> newLine)
       return (show msg)
 
--- Serializes to: 0A036B65791204313233341A01782204353637382A01793140000000000000003A026D65
+-- Serializes to: "0A060000000100021204313233341A01782204353637382A01793140000000000000003A026D65"
 proof :: LocnProof
 proof = LocnProof
-  { vault_key = "key"
+  { vault_key = [0,1,2]
   , uid = "1234"
   , unonce = "x"
   , apid = "5678"

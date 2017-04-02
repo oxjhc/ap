@@ -32,7 +32,6 @@ import           Vault
 -- Useful for defining the Encode and Decode instances
 encodeGen :: forall a b. (ProtoIso a b, Encode a) => b -> Builder
 encodeGen = encode @a . toProto @a @b
-
 decodeGen :: forall a b. (ProtoIso a b, Decode a) =>
   HashMap Tag [WireField] -> Data.Binary.Get.Get b
 decodeGen = fmap (fromProto @a @b). decode @a
@@ -126,7 +125,7 @@ data LocnProof' = LocnProof'
   } deriving (Generic, Show, Eq)
 
 data LocnProof = LocnProof
-  { vault_key :: ByteString
+  { vault_key :: [PrimeField]
   , uid       :: ByteString
   , unonce    :: ByteString
   , apid      :: ByteString
@@ -155,7 +154,7 @@ data Token' = Token'
 
 data Token = Token
   { vnonce   :: ByteString
-  , locn_tag :: ByteString
+  , locn_tag :: Polynomial PrimeField
   } deriving (Generic, Show, Eq)
 
 instance Encode Token'

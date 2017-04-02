@@ -1,7 +1,8 @@
 {-# LANGUAGE DeriveGeneric         #-}
 
 module Vault(
-    Vault(..)
+    Vault(..),
+    Polynomial(..)
 ) where
 
 import qualified Data.Set as Set
@@ -53,7 +54,7 @@ instance Num n => Num (Polynomial n) where
     -- It should be possible to divide by the signum of anything, but as the only bound on the result is that it's a Num, it's impossible to derive a sensible abs for polynomials (i.e. take the abs of the first term and scale everything else by the same amount).
     abs a = a
     signum a = 1
-    fromInteger n = P [fromInteger n]
+    fromInteger n =  if n == 0 then P [] else P [fromInteger n]
 
 -- Finite fields aren't naturally members of Ord, but it's probably not too hard to provide an instance.
 openVault :: (Fractional n, Ord n) => Vault n -> [n] -> Polynomial n
