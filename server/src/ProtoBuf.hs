@@ -14,7 +14,7 @@ import           Data.Hex
 import           Data.Int
 import           Data.ProtocolBuffers
 import           Data.Serialize            hiding (encode, decode)
-import           Data.Text                 (Text)
+import           Data.ByteString           (ByteString) --Text would perform Unicode checks, so isn't suitable.
 import           Data.Word
 import           GHC.Generics              (Generic)
 import           Network.HTTP.Media
@@ -65,22 +65,22 @@ instance Decode (Vault PrimeField) where
 
 data VaultMsg' = VaultMsg'
   { vault   :: Required 1 (Message (Vault PrimeField))
-  , uid     :: Required 2 (Value Text)
-  , unonce  :: Required 3 (Value Text)
-  , apid    :: Required 4 (Value Text)
-  , apnonce :: Required 5 (Value Text)
+  , uid     :: Required 2 (Value ByteString)
+  , unonce  :: Required 3 (Value ByteString)
+  , apid    :: Required 4 (Value ByteString)
+  , apnonce :: Required 5 (Value ByteString)
   , time    :: Required 6 (Value (Fixed Word64))
-  , sig     :: Required 7 (Value Text)
+  , sig     :: Required 7 (Value ByteString)
   } deriving (Generic, Show, Eq)
 
 data VaultMsg = VaultMsg
   { vault   :: Vault PrimeField
-  , uid     :: String
-  , unonce  :: String
-  , apid    :: String
-  , apnonce :: String
+  , uid     :: ByteString
+  , unonce  :: ByteString
+  , apid    :: ByteString
+  , apnonce :: ByteString
   , time    :: Word64
-  , sig     :: String
+  , sig     :: ByteString
   } deriving (Generic, Show, Eq)
 
 instance Encode VaultMsg'
@@ -102,23 +102,23 @@ message LocnProof {
 -}
 
 data LocnProof' = LocnProof'
-  { vault_key :: Required 1 (Value Text)
-  , uid       :: Required 2 (Value Text)
-  , unonce    :: Required 3 (Value Text)
-  , apid      :: Required 4 (Value Text)
-  , apnonce   :: Required 5 (Value Text)
+  { vault_key :: Required 1 (Value ByteString)
+  , uid       :: Required 2 (Value ByteString)
+  , unonce    :: Required 3 (Value ByteString)
+  , apid      :: Required 4 (Value ByteString)
+  , apnonce   :: Required 5 (Value ByteString)
   , time      :: Required 6 (Value (Fixed Word64))
-  , sig       :: Required 7 (Value Text)
+  , sig       :: Required 7 (Value ByteString)
   } deriving (Generic, Show, Eq)
 
 data LocnProof = LocnProof
-  { vault_key :: String
-  , uid       :: String
-  , unonce    :: String
-  , apid      :: String
-  , apnonce   :: String
+  { vault_key :: ByteString
+  , uid       :: ByteString
+  , unonce    :: ByteString
+  , apid      :: ByteString
+  , apnonce   :: ByteString
   , time      :: Word64
-  , sig       :: String
+  , sig       :: ByteString
   } deriving (Generic, Show, Eq)
 
 instance Encode LocnProof'
@@ -135,13 +135,13 @@ message Token {
 -}
 
 data Token' = Token'
-  { vnonce   :: Required 1 (Value Text)
-  , locn_tag :: Required 2 (Value Text)
+  { vnonce   :: Required 1 (Value ByteString)
+  , locn_tag :: Required 2 (Value ByteString)
   } deriving (Generic, Show, Eq)
 
 data Token = Token
-  { vnonce   :: String
-  , locn_tag :: String
+  { vnonce   :: ByteString
+  , locn_tag :: ByteString
   } deriving (Generic, Show, Eq)
 
 instance Encode Token'
