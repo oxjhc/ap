@@ -58,6 +58,6 @@ instance (CodableEquivalent (a p) (b p)) => CodableEquivalent (M1 i c a p) (M1 i
     fromCodable = M1 . fromCodable . unM1
 
 encodeGen :: (Generic a, Generic b, CodableEquivalent (Rep a ()) (Rep b ()), Encode a) => a -> b -> Builder
-encodeGen a = undefined -- encode . asTypeOf a . (to :: Generic a => Rep a () -> a) . toCodable . (from :: Generic b => b -> Rep b ())
+encodeGen a = encode . flip asTypeOf a . (to :: Generic a => Rep a () -> a) . toCodable . (from :: Generic b => b -> Rep b ())
 decodeGen :: (Generic a, Generic b, CodableEquivalent (Rep a ()) (Rep b ()), Decode a) => a -> HashMap Tag [WireField] -> Get b
-decodeGen a = undefined -- fmap ((to :: Generic b => Rep b () -> b) . fromCodable . (from :: Generic a => a -> Rep a ()) . asTypeOf a) . decode
+decodeGen a = fmap ((to :: Generic b => Rep b () -> b) . fromCodable . (from :: Generic a => a -> Rep a ()) . flip asTypeOf a) . decode
