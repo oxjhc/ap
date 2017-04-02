@@ -16,10 +16,15 @@ module ProtoBufConverter(
 import GHC.Generics
 import Data.ProtocolBuffers
 import Data.ProtocolBuffers.Internal (Tag, WireField)
-import Data.Binary.Builder.Sized (Builder)
-import Data.Binary.Get (Get)
-import Data.Text
+import Data.Binary.Builder.Sized (Builder, toLazyByteString, putWord16be)
+import Data.Binary.Get (Get, getWord16be, isEmpty, runGet)
+import Data.Text (Text, pack, unpack)
+import Data.ByteString.Lazy (fromStrict, toStrict)
+import Data.ByteString (ByteString)
 import Data.HashMap.Strict (HashMap)
+import Data.Maybe
+import Number
+import Vault (Polynomial(..))
 
 class CodableEquivalent a b where
     toCodable :: b -> a
@@ -35,6 +40,18 @@ instance Wrapper (Fixed x) x where
 instance Wrapper Text String where
     wrap = pack
     unwrap = unpack
+instance Wrapper ByteString [PrimeField] where --At this point it becomes clear that "Wrapper" was a poor choice.
+    wrap = toStrict . toLazyByteString . mconcat . map (putWord16be . toEnum . fromEnum)
+    unwrap = map (toEnum . fromEnum) . runGet getWords . fromStrict
+        where getWords = do --For some reason Get is strict, so I have to do the recursion explicitly.
+                  e <- isEmpty
+                  if e then
+                      return []
+                  else
+                      (:) <$> getWord16be <*> getWords
+instance Wrapper ByteString (Polynomial PrimeField) where
+    wrap = wrap . unPoly
+    unwrap = P . unwrap
 instance Wrapper x x where
     wrap = id
     unwrap = id

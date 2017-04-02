@@ -112,7 +112,7 @@ data LocnProof' = LocnProof'
   } deriving (Generic, Show, Eq)
 
 data LocnProof = LocnProof
-  { vault_key :: ByteString
+  { vault_key :: [PrimeField]
   , uid       :: ByteString
   , unonce    :: ByteString
   , apid      :: ByteString
@@ -141,7 +141,7 @@ data Token' = Token'
 
 data Token = Token
   { vnonce   :: ByteString
-  , locn_tag :: ByteString
+  , locn_tag :: Polynomial PrimeField
   } deriving (Generic, Show, Eq)
 
 instance Encode Token'
