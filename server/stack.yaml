@@ -4,7 +4,7 @@ packages:
 - location: .
 - location:
     git: https://github.com/oxjhc/protobuf.git
-    commit: 86ebcef78224e790a2ea78d6e6f360b4fd3f7e67
+    commit: 92663f197d44b21421c09bb63a83ede190e56ea9
   extra-dep: true
 extra-deps:
 - haskell-src-exts-1.17.1
