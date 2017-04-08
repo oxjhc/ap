@@ -1,0 +1,15 @@
+flags: {}
+extra-package-dbs: []
+packages:
+- location: .
+- location:
+    git: https://github.com/oxjhc/protobuf.git
+    commit: 92663f197d44b21421c09bb63a83ede190e56ea9
+  extra-dep: true
+extra-deps:
+- haskell-src-exts-1.17.1
+- type-level-0.3.0
+- protobuf-0.3.0.0
+explicit-setup-deps:
+  proto: true
+resolver: lts-8.6
