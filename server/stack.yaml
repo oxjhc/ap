@@ -10,6 +10,7 @@ extra-deps:
 - haskell-src-exts-1.17.1
 - type-level-0.3.0
 - protobuf-0.3.0.0
+- saltine-0.0.0.4
 explicit-setup-deps:
   proto: true
 resolver: lts-8.6

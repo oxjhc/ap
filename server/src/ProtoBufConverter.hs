@@ -16,6 +16,7 @@ module ProtoBufConverter(
     toProto,
     fromProto,
     ProtoIso,
+    wrap,
 ) where
 
 import           Data.Binary.Builder.Sized (putWord16be, toLazyByteString)
@@ -28,7 +29,7 @@ import           Data.ProtocolBuffers
 import           Data.Text                 (Text, pack, unpack)
 import           GHC.Generics
 import           Number
-import           Vault                     (Polynomial (..))
+import           Vault                     (Polynomial (..), Key)
 
 
 -- Wrap/unwrap types that occur in the protobuf library to/from types that we
@@ -46,8 +47,10 @@ instance Wrapper (Signed x) x where
 instance Wrapper Text String where
     wrap = pack
     unwrap = unpack
-instance Wrapper ByteString [PrimeField] where
+instance Wrapper ByteString Key where
 -- At this point it becomes clear that "Wrapper" was a poor choice.
+-- TODO add decryption to this (m3 contains the vault key encrypted with the verifier's key.)
+-- Note when adding encryption that the instance for Polynomial should be changed so that it isn't encrypted.
     wrap = toStrict . toLazyByteString . mconcat . map (putWord16be . toEnum . fromEnum)
     unwrap = map (toEnum . fromEnum) . runGet getWords . fromStrict
         -- For some reason Get is strict, so I have to do the recursion explicitly.

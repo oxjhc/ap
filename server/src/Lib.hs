@@ -16,13 +16,15 @@ import           Network.Wai
 import           Network.Wai.Handler.Warp
 import           ProtoBuf
 import           Servant                  hiding (Vault)
+import           Vault
+import           Verify
+import           Number --Only used for the mock retrieveVault.
 
 type API =
        -- Get a LocnProof and check if it is valid, and if so return Token.
        "proof" :> ReqBody '[ProtoBuf] LocnProof :> Post '[ProtoBuf] Token
        -- Receive a VaultMsg, printing it out for now.
   :<|> "vault" :> ReqBody '[ProtoBuf] VaultMsg :> Post '[PlainText] String
-  :<|> "test" :> Get '[PlainText] String
 
 startApp :: IO ()
 startApp = run 8080 app
@@ -36,16 +38,15 @@ api = Proxy
 server :: Server API
 server = checkProof
     :<|> receiveVaultMsg
-    :<|> return "Success!"
   where
     newLine = putStr "\n"
     checkProof :: LocnProof -> Handler Token
     checkProof prf = do
       liftIO (putStrLn "Checking proof." >> print prf >> newLine)
-      if prf == proof then
-        return token
-      else
-        throwError (err400 {errBody = "Invalid proof."})
+      vault <- retreiveVault prf
+      case checkVault prf =<< vault of
+        Right lt  -> liftIO $ flip Token lt <$> encode <$> newNonce
+        Left  err -> throwError (err400 {errBody = err})
       where
         token = Token
           { vnonce = "abcd"
@@ -67,3 +68,7 @@ proof = LocnProof
   , time = 64
   , sig = "me"
   }
+
+-- A mock implementation. Replace with retrieving the vault fom the database.
+retrieveVault :: LocnProof -> IO (Either String (Vault PrimeField))
+retrieveVault = const $ return $ return $ Vault [(0,0),(1,1),(2,4),(3,3)]

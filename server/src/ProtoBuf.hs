@@ -9,7 +9,14 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeApplications      #-}
 
-module ProtoBuf where
+module ProtoBuf(
+    VaultMsg(..),
+    LocnProof(..),
+    M3(..),
+    extractM3,
+    Token(..),
+    ProtoBuf
+)where
 
 import           Data.Binary.Builder.Sized
 import           Data.Binary.Get
@@ -125,7 +132,7 @@ data LocnProof' = LocnProof'
   } deriving (Generic, Show, Eq)
 
 data LocnProof = LocnProof
-  { vault_key :: [PrimeField]
+  { vault_key :: Key
   , uid       :: ByteString
   , unonce    :: ByteString
   , apid      :: ByteString
@@ -139,6 +146,33 @@ instance Decode LocnProof'
 
 instance Encode LocnProof where encode = encodeGen @LocnProof' @LocnProof
 instance Decode LocnProof where decode = decodeGen @LocnProof' @LocnProof
+
+data M3' = M3'
+  { vault_key :: Required 1 (Value ByteString)
+  , uid       :: Required 2 (Value ByteString)
+  , unonce    :: Required 3 (Value ByteString)
+  , apid      :: Required 4 (Value ByteString)
+  , apnonce   :: Required 5 (Value ByteString)
+  , time      :: Required 6 (Value (Fixed Word64))
+  } deriving (Generic, Show, Eq)
+
+data M3 = M3
+  { vault_key :: Key
+  , uid       :: ByteString
+  , unonce    :: ByteString
+  , apid      :: ByteString
+  , apnonce   :: ByteString
+  , time      :: Word64
+  } deriving (Generic, Show, Eq)
+
+instance Encode M3'
+instance Decode M3'
+
+instance Encode M3 where encode = encodeGen @M3' @M3
+instance Decode M3 where decode = decodeGen @M3' @M3
+
+extractM3 :: LocnProof -> M3
+extractM3 (LocnProof vk u un ap apn t _) = M3 vk u un ap apn
 
 {-
 message Token {
