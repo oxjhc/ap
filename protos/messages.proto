@@ -7,8 +7,8 @@ message ProofReq {
 	required bytes vid = 4;
 }
 
-message SignedProofResp {
-	required ProofResp proofresp = 1;
+message SignedProofReq {
+	required ProofReq proofreq = 1;
 	required bytes sig = 2;
 }
 
@@ -60,4 +60,9 @@ message SignedLocnProof {
 message Token {
 	required bytes vnonce = 1;
 	required bytes locn_tag = 2;
+}
+
+message SignedToken {
+	required Token token = 1;
+	required bytes sig = 2;
 }
