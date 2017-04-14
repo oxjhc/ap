@@ -20,6 +20,7 @@ library
                      , Vault
                      , Number
   other-modules:       ProtoBufConverter
+                     , Verify
   build-depends:       base >= 4.7 && < 5
                      , aeson
                      , protobuf == 0.3.0.0
@@ -37,6 +38,7 @@ library
                      , unordered-containers
                      , binary
                      , saltine
+                     , utf8-string
   default-language:    Haskell2010
 
 executable server-exe

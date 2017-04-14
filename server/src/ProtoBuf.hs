@@ -172,7 +172,7 @@ instance Encode M3 where encode = encodeGen @M3' @M3
 instance Decode M3 where decode = decodeGen @M3' @M3
 
 extractM3 :: LocnProof -> M3
-extractM3 (LocnProof vk u un ap apn t _) = M3 vk u un ap apn
+extractM3 (LocnProof vk u un ap apn t _) = M3 vk u un ap apn t
 
 {-
 message Token {

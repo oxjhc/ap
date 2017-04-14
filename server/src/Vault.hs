@@ -3,12 +3,15 @@
 module Vault(
     Vault(..),
     Polynomial(..),
-    Key
+    Key,
+    openVault
 ) where
 
 import qualified Data.Set as Set
 import Data.List
 import GHC.Generics (Generic)
+
+import Number
 
 newtype Vault n = Vault [(n, n)] deriving (Eq, Show, Generic)
 newtype Polynomial n = P{unPoly :: [n]}

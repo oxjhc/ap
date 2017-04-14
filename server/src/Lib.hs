@@ -11,11 +11,16 @@ module Lib
     ) where
 
 import           Control.Monad.IO.Class
+import           Data.ByteString.UTF8 (fromString)
+import           Data.ByteString.Lazy (fromStrict)
 import           Data.ProtocolBuffers
 import           Network.Wai
 import           Network.Wai.Handler.Warp
-import           ProtoBuf
 import           Servant                  hiding (Vault)
+import           Crypto.Saltine.Core.Box (newNonce)
+import qualified Crypto.Saltine.Class as SaltClass
+
+import           ProtoBuf
 import           Vault
 import           Verify
 import           Number --Only used for the mock retrieveVault.
@@ -43,15 +48,14 @@ server = checkProof
     checkProof :: LocnProof -> Handler Token
     checkProof prf = do
       liftIO (putStrLn "Checking proof." >> print prf >> newLine)
-      vault <- retreiveVault prf
+      vault <- liftIO $ retrieveVault prf
       case checkVault prf =<< vault of
-        Right lt  -> liftIO $ flip Token lt <$> encode <$> newNonce
-        Left  err -> throwError (err400 {errBody = err})
-      where
-        token = Token
-          { vnonce = "abcd"
-          , locn_tag = 0
-          }
+        Right lt  -> liftIO $ do
+          putStrLn ("Recieved valid proof: " ++ show lt)
+          flip Token lt <$> SaltClass.encode <$> newNonce
+        Left  err -> do
+          liftIO $ putStrLn ("Recieved incorrect proof: "++err)
+          throwError (err400 {errBody = fromStrict $ fromString err})
     receiveVaultMsg :: VaultMsg -> Handler String
     receiveVaultMsg msg = do
       liftIO (putStrLn "Received message." >> print msg >> newLine)
