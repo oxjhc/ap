@@ -5,13 +5,21 @@ message ProofReq {
 	required bytes unonce = 2;
 	required int64 seqid = 3;
 	required bytes vid = 4;
-	required bytes sig = 5;
+}
+
+message SignedProofResp {
+	required ProofResp proofresp = 1;
+	required bytes sig = 2;
 }
 
 message ProofResp {
 	required bytes uid = 1;
 	required bytes unonce = 2;
-	required bytes sig = 3;
+}
+
+message SignedProofResp {
+	required ProofResp proofresp = 1;
+	required bytes sig = 2;
 }
 
 message VaultMsg {
@@ -28,7 +36,11 @@ message VaultMsg {
 	required bytes apid = 4;
 	required bytes apnonce = 5;
 	required fixed64 time = 6;
-	required bytes sig = 7;
+}
+
+message SignedVaultMsg {
+	required VaultMsg = 1;
+	required bytes sig = 2;
 }
 
 message LocnProof {
@@ -38,7 +50,11 @@ message LocnProof {
 	required bytes apid = 4;
 	required bytes apnonce = 5;
 	required fixed64 time = 6;
-	required bytes sig = 7;
+}
+
+message SignedLocnProof {
+	required LocnProof locnproof = 1;
+	required bytes sig = 2;
 }
 
 message Token {
