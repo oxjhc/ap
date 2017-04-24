@@ -9,7 +9,13 @@
 module Server where
 
 import           Control.Monad.IO.Class
+import           Control.Monad.Logger     (runStderrLoggingT)
 import           Data.ProtocolBuffers
+import           Data.String.Conversions
+import           Database.Persist
+import           Database.Persist.Sql
+import           Database.Persist.Sqlite
+import           Models
 import           Network.Wai
 import           Network.Wai.Handler.Warp
 import           ProtoBuf
@@ -26,17 +32,25 @@ type ServerAPI =
        -- Sanity check that the server is running.
   :<|> "ping" :> Get '[PlainText] PingResp
 
-startApp :: IO ()
-startApp = run 8080 app
+startApp :: FilePath -> IO ()
+startApp sqliteFile = run 8080 =<< makeApp sqliteFile
 
-app :: Application
-app = serve api server
+makeApp :: FilePath -> IO Application
+makeApp sqliteFile = do
+  pool <- runStderrLoggingT $
+    createSqlitePool (cs sqliteFile) 5
+
+  runSqlPool (runMigration migrateAll) pool
+  return $ app pool
+
+app :: ConnectionPool -> Application
+app pool = serve api $ server pool
 
 api :: Proxy ServerAPI
 api = Proxy
 
-server :: Server ServerAPI
-server = checkProof
+server :: ConnectionPool -> Server ServerAPI
+server pool = checkProof
     :<|> receiveVaultMsg
     :<|> return (PingResp "Success!")
   where
@@ -50,6 +64,8 @@ server = checkProof
         throwError (err400 {errBody = "Invalid proof."})
     receiveVaultMsg :: SignedVaultMsg -> Handler VaultResp
     receiveVaultMsg msg = do
+      liftIO . flip runSqlPersistMPool pool $ do
+        insert (Models.Message "a" "b" "c" "d" "e" 0)
       liftIO (putStrLn "Received message." >> print msg >> newLine)
       return (VaultResp $ show msg)
 
