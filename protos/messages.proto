@@ -1,19 +1,30 @@
 syntax = "proto2";
 
+// m1
 message ProofReq {
 	required bytes uid = 1;
 	required bytes unonce = 2;
 	required int64 seqid = 3;
 	required bytes vid = 4;
-	required bytes sig = 5;
 }
 
+message SignedProofReq {
+	required ProofReq proofreq = 1;
+	required bytes sig = 2;
+}
+
+// m2
 message ProofResp {
 	required bytes uid = 1;
 	required bytes unonce = 2;
-	required bytes sig = 3;
 }
 
+message SignedProofResp {
+	required ProofResp proofresp = 1;
+	required bytes sig = 2;
+}
+
+//m4
 message VaultMsg {
 	message Vault {
 		message Point {
@@ -28,9 +39,14 @@ message VaultMsg {
 	required bytes apid = 4;
 	required bytes apnonce = 5;
 	required fixed64 time = 6;
-	required bytes sig = 7;
 }
 
+message SignedVaultMsg {
+	required VaultMsg = 1;
+	required bytes sig = 2;
+}
+
+// m3
 message LocnProof {
 	required bytes vault_key = 1;
 	required bytes uid = 2;
@@ -38,10 +54,20 @@ message LocnProof {
 	required bytes apid = 4;
 	required bytes apnonce = 5;
 	required fixed64 time = 6;
-	required bytes sig = 7;
 }
 
+message SignedLocnProof {
+	required LocnProof locnproof = 1;
+	required bytes sig = 2;
+}
+
+// m5
 message Token {
 	required bytes vnonce = 1;
 	required bytes locn_tag = 2;
+}
+
+message SignedToken {
+	required Token token = 1;
+	required bytes sig = 2;
 }
