@@ -9,17 +9,21 @@
 module Server where
 
 import           Control.Monad.IO.Class
-import           Control.Monad.Logger     (runStderrLoggingT)
+import           Control.Monad.Logger      (runStderrLoggingT)
+import           Data.Binary.Builder.Sized
+import           Data.Binary.Get           (runGetOrFail)
+import           Data.ByteString           (ByteString)
+import           Data.ByteString.Lazy      (fromStrict, toStrict)
 import           Data.ProtocolBuffers
 import           Data.String.Conversions
 import           Database.Persist
 import           Database.Persist.Sql
 import           Database.Persist.Sqlite
 import           Models
-import           Network.Wai
+import           Network.Wai               hiding (vault)
 import           Network.Wai.Handler.Warp
 import           ProtoBuf
-import           Servant                  hiding (Vault)
+import           Servant                   hiding (Vault)
 
 newtype VaultResp = VaultResp String deriving (Eq, Show, MimeRender PlainText)
 newtype PingResp = PingResp String deriving (Eq, Show, MimeRender PlainText)
@@ -55,18 +59,51 @@ server pool = checkProof
     :<|> return (PingResp "Success!")
   where
     newLine = putStr "\n"
+    -- Function to check proof
+    valid :: ByteString -> Vault -> Bool
+    valid key vault = True
+
     checkProof :: SignedLocnProof -> Handler SignedToken
     checkProof signedProof = do
+      let prf  = getField $ locnproof signedProof
       liftIO (putStrLn "Checking proof." >> print signedProof >> newLine)
-      if (getField . locnproof) signedProof == proof then
-        return SignedToken {token = putField Server.token, sig = putField "0"}
-      else
-        throwError (err400 {errBody = "Invalid proof."})
+      res <- liftIO $ flip runSqlPersistMPool pool $ do
+        let uid'          = getField $ uid     (prf :: LocnProof)
+            unonce'       = getField $ unonce  (prf :: LocnProof)
+            apid'         = getField $ apid    (prf :: LocnProof)
+            apnonce'      = getField $ apnonce (prf :: LocnProof)
+            (Fixed time') = getField $ time    (prf :: LocnProof)
+        getBy (MessageID uid' unonce' apid' apnonce' (fromIntegral time'))
+      case res of
+        -- Not a 404 because that leaks information
+        Nothing -> throwError (err400 {errBody = "Invalid proof."})
+        Just blob -> case runGetOrFail decodeMessage . fromStrict .
+                          messageVault . entityVal $ blob of
+          Left (_, _, err)    -> throwError (err400 {errBody = "Corrupt."})
+          Right (_, _, vault) -> do
+            let key = getField $ vault_key prf
+            if valid key vault then
+              return SignedToken
+                {token = putField Server.token, sig = putField "0"}
+            else
+              throwError (err400 {errBody = "Invalid proof."})
+
     receiveVaultMsg :: SignedVaultMsg -> Handler VaultResp
-    receiveVaultMsg msg = do
-      liftIO . flip runSqlPersistMPool pool $ do
-        insert (Models.Message "a" "b" "c" "d" "e" 0)
-      liftIO (putStrLn "Received message." >> print msg >> newLine)
+    receiveVaultMsg signedMsg = liftIO $ do
+      let msg = getField . vault_msg $ signedMsg
+      res <- flip runSqlPersistMPool pool $ do
+        let vault'        = toStrict . toLazyByteString . encodeMessage $
+                              (getField . vault $ msg)
+            uid'          = getField $ uid     (msg :: VaultMsg)
+            unonce'       = getField $ unonce  (msg :: VaultMsg)
+            apid'         = getField $ apid    (msg :: VaultMsg)
+            apnonce'      = getField $ apnonce (msg :: VaultMsg)
+            (Fixed time') = getField $ time    (msg :: VaultMsg)
+        insertBy (Message vault' uid' unonce' apid' apnonce' (fromIntegral time'))
+      putStrLn "Received message." >> print msg >> newLine
+      case res of
+        Left _  -> putStrLn "WARNING: Duplicate exists, did not write."
+        Right _ -> return ()
       return (VaultResp $ show msg)
 
 -- A valid SignedLocnProof that has this as the payload is:
