@@ -27,7 +27,7 @@ import           Network.HTTP.Media
 import           Number
 import           ProtoBufConverter
 import           Servant                       hiding (Vault)
-import           Vault
+import qualified Vault                         as V
 
 -- Useful for defining the Encode and Decode instances
 encodeGen :: forall a b. (ProtoIso a b, Encode a) => b -> Builder
@@ -37,6 +37,7 @@ decodeGen :: forall a b. (ProtoIso a b, Decode a) =>
 decodeGen = fmap (fromProto @a @b). decode @a
 
 {-
+//m4
 message VaultMsg {
 	message Vault {
 		message Point {
@@ -51,58 +52,51 @@ message VaultMsg {
 	required bytes apid = 4;
 	required bytes apnonce = 5;
 	required fixed64 time = 6;
-	required bytes sig = 7;
+}
+
+message SignedVaultMsg {
+	required VaultMsg vault_msg = 1;
+	required bytes sig = 2;
 }
 -}
 
 data Point = Point
-  { x :: Required 1 (Enumeration PrimeField)
-  , y :: Required 2 (Enumeration PrimeField)
+  { x :: Required 1 (Value Word32)
+  , y :: Required 2 (Value Word32)
   } deriving (Generic, Show, Eq)
 
 instance Encode Point
 instance Decode Point
 
-data Vault' = Vault'
+data Vault = Vault
   { points :: Repeated 1 (Message Point)
   } deriving (Generic, Show, Eq)
 
-instance Encode Vault'
-instance Decode Vault'
+instance Encode Vault
+instance Decode Vault
 
-instance Encode (Vault PrimeField) where
-    encode (Vault ps) = encode $ Vault' $ putField $ flip map ps $ (\(x, y) -> Point (putField x) (putField y))
-instance Decode (Vault PrimeField) where
-    decode = fmap (Vault . map (\(Point x y) -> (getField x, getField y)) . getField . points) . decode
-
-
-data VaultMsg' = VaultMsg'
-  { vault   :: Required 1 (Message (Vault PrimeField))
+data VaultMsg = VaultMsg
+  { vault   :: Required 1 (Message Vault)
   , uid     :: Required 2 (Value ByteString)
   , unonce  :: Required 3 (Value ByteString)
   , apid    :: Required 4 (Value ByteString)
   , apnonce :: Required 5 (Value ByteString)
   , time    :: Required 6 (Value (Fixed Word64))
-  , sig     :: Required 7 (Value ByteString)
   } deriving (Generic, Show, Eq)
 
-data VaultMsg = VaultMsg
-  { vault   :: Vault PrimeField
-  , uid     :: ByteString
-  , unonce  :: ByteString
-  , apid    :: ByteString
-  , apnonce :: ByteString
-  , time    :: Word64
-  , sig     :: ByteString
+instance Encode VaultMsg
+instance Decode VaultMsg
+
+data SignedVaultMsg = SignedVaultMsg
+  { vault_msg :: Required 1 (Message VaultMsg)
+  , sig       :: Required 2 (Value ByteString)
   } deriving (Generic, Show, Eq)
 
-instance Encode VaultMsg'
-instance Decode VaultMsg'
-
-instance Encode VaultMsg where encode = encodeGen @VaultMsg' @VaultMsg
-instance Decode VaultMsg where decode = decodeGen @VaultMsg' @VaultMsg
+instance Encode SignedVaultMsg
+instance Decode SignedVaultMsg
 
 {-
+// m3
 message LocnProof {
 	required bytes vault_key = 1;
 	required bytes uid = 2;
@@ -110,58 +104,62 @@ message LocnProof {
 	required bytes apid = 4;
 	required bytes apnonce = 5;
 	required fixed64 time = 6;
-	required bytes sig = 7;
+}
+
+message SignedLocnProof {
+	required LocnProof locnproof = 1;
+	required bytes sig = 2;
 }
 -}
 
-data LocnProof' = LocnProof'
+data LocnProof = LocnProof
   { vault_key :: Required 1 (Value ByteString)
   , uid       :: Required 2 (Value ByteString)
   , unonce    :: Required 3 (Value ByteString)
   , apid      :: Required 4 (Value ByteString)
   , apnonce   :: Required 5 (Value ByteString)
   , time      :: Required 6 (Value (Fixed Word64))
-  , sig       :: Required 7 (Value ByteString)
   } deriving (Generic, Show, Eq)
 
-data LocnProof = LocnProof
-  { vault_key :: [PrimeField]
-  , uid       :: ByteString
-  , unonce    :: ByteString
-  , apid      :: ByteString
-  , apnonce   :: ByteString
-  , time      :: Word64
-  , sig       :: ByteString
+instance Encode LocnProof
+instance Decode LocnProof
+
+data SignedLocnProof = SignedLocnProof
+  { locnproof :: Required 1 (Message LocnProof)
+  , sig       :: Required 2 (Value ByteString)
   } deriving (Generic, Show, Eq)
 
-instance Encode LocnProof'
-instance Decode LocnProof'
-
-instance Encode LocnProof where encode = encodeGen @LocnProof' @LocnProof
-instance Decode LocnProof where decode = decodeGen @LocnProof' @LocnProof
+instance Encode SignedLocnProof
+instance Decode SignedLocnProof
 
 {-
+// m5
 message Token {
 	required bytes vnonce = 1;
 	required bytes locn_tag = 2;
 }
+
+message SignedToken {
+	required Token token = 1;
+	required bytes sig = 2;
+}
 -}
 
-data Token' = Token'
+data Token = Token
   { vnonce   :: Required 1 (Value ByteString)
   , locn_tag :: Required 2 (Value ByteString)
   } deriving (Generic, Show, Eq)
 
-data Token = Token
-  { vnonce   :: ByteString
-  , locn_tag :: Polynomial PrimeField
+instance Encode Token
+instance Decode Token
+
+data SignedToken = SignedToken
+  { token :: Required 1 (Message Token)
+  , sig   :: Required 2 (Value ByteString)
   } deriving (Generic, Show, Eq)
 
-instance Encode Token'
-instance Decode Token'
-
-instance Encode Token where encode = encodeGen @Token' @Token
-instance Decode Token where decode = decodeGen @Token' @Token
+instance Encode SignedToken
+instance Decode SignedToken
 
 data ProtoBuf
 

@@ -19,10 +19,10 @@ newtype VaultResp = VaultResp String deriving (Eq, Show, MimeRender PlainText)
 newtype PingResp = PingResp String deriving (Eq, Show, MimeRender PlainText)
 
 type ServerAPI =
-       -- Get a LocnProof and check if it is valid, and if so return Token.
-       "proof" :> ReqBody '[ProtoBuf] LocnProof :> Post '[ProtoBuf] Token
-       -- Receive a VaultMsg, printing it out for now.
-  :<|> "vault" :> ReqBody '[ProtoBuf] VaultMsg :> Post '[PlainText] VaultResp
+       -- Get a SignedLocnProof and check if it is valid, and if so return SignedToken.
+       "proof" :> ReqBody '[ProtoBuf] SignedLocnProof :> Post '[ProtoBuf] SignedToken
+       -- Receive a SignedVaultMsg, printing it out for now.
+  :<|> "vault" :> ReqBody '[ProtoBuf] SignedVaultMsg :> Post '[PlainText] VaultResp
        -- Sanity check that the server is running.
   :<|> "ping" :> Get '[PlainText] PingResp
 
@@ -41,32 +41,34 @@ server = checkProof
     :<|> return (PingResp "Success!")
   where
     newLine = putStr "\n"
-    checkProof :: LocnProof -> Handler Token
-    checkProof prf = do
-      liftIO (putStrLn "Checking proof." >> print prf >> newLine)
-      if prf == proof then
-        return token
+    checkProof :: SignedLocnProof -> Handler SignedToken
+    checkProof signedProof = do
+      liftIO (putStrLn "Checking proof." >> print signedProof >> newLine)
+      if (getField . locnproof) signedProof == proof then
+        return SignedToken {token = putField Server.token, sig = putField "0"}
       else
         throwError (err400 {errBody = "Invalid proof."})
-    receiveVaultMsg :: VaultMsg -> Handler VaultResp
+    receiveVaultMsg :: SignedVaultMsg -> Handler VaultResp
     receiveVaultMsg msg = do
       liftIO (putStrLn "Received message." >> print msg >> newLine)
       return (VaultResp $ show msg)
 
--- Serializes to: "0A060000000100021204313233341A01782204353637382A01793140000000000000003A026D65"
+-- A valid SignedLocnProof that has this as the payload is:
+-- 0A200A033132331204313233341A01782204353637382A0179314000000000000000120130
 proof :: LocnProof
 proof = LocnProof
-  { vault_key = [0,1,2]
-  , uid = "1234"
-  , unonce = "x"
-  , apid = "5678"
-  , apnonce = "y"
-  , time = 64
-  , sig = "me"
+  { vault_key = putField "123"
+  , uid = putField "1234"
+  , unonce = putField "x"
+  , apid = putField "5678"
+  , apnonce = putField "y"
+  , time = putField 64
   }
 
+-- A valid SignedToken which has this as the payload is:
+-- 0A090A0461626364120130120130
 token :: Token
 token = Token
-  { vnonce = "abcd"
-  , locn_tag = 0
+  { vnonce = putField "abcd"
+  , locn_tag = putField "0"
   }
