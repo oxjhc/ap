@@ -46,6 +46,10 @@ library
                      , monad-logger
                      , string-conversions
                      , cryptonite
+                     , asn1-parse
+                     , asn1-types
+                     , asn1-encoding
+                     , pem
   default-language:    Haskell2010
 
 executable server-exe
