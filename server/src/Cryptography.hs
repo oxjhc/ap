@@ -27,9 +27,9 @@ test = do
   (pubKey, privKey) <- generate p256
   print pubKey
   print privKey
-  sig <- sign privKey SHA3_512 text
+  sig <- sign privKey SHA256 text
   print sig
-  let valid = verify SHA3_512 pubKey sig text
+  let valid = verify SHA256 pubKey sig text
   if valid then
     putStrLn "Works."
   else
@@ -38,7 +38,7 @@ test = do
 
 -- RFC5480 excerpt:
 --
--- The ASN1 format for the p ublic key is:
+-- The ASN1 format for the public key is:
 --
 -- SubjectPublicKeyInfo  ::=  SEQUENCE  {
 --        algorithm         AlgorithmIdentifier,
@@ -134,6 +134,38 @@ parsePrivKey = do
   getMany getNext-- throw rest away
   return (PrivateKey p256 privNum)
 
+-- RFC5480 excerpt
+--
+-- ECDSA-Sig-Value ::= SEQUENCE {
+--   r  INTEGER,
+--   s  INTEGER
+-- }
+--
+-- Originally in ANSI X9.62-1998
+parseSig :: ParseASN1 Signature
+parseSig = do
+  getNext -- Start Sequence
+  r <- getNext >>= \case
+    IntVal r -> return r
+    _ -> throwParseError "Expecting integer"
+  s <- getNext >>= \case
+    IntVal s -> return s
+    _ -> throwParseError "Expecting integer"
+  getNext -- End Sequence
+  return (Signature r s)
+
+encodeSig :: Signature -> LBS.ByteString
+encodeSig sig = encodeASN1 DER asn1
+  where
+    (Signature r s) = sig
+    asn1 =
+      [ Start Sequence
+      , IntVal r
+      , IntVal s
+      , End Sequence
+      ]
+
+
 readPubKey :: IO ()
 readPubKey = do
   pubKey <- LBS.readFile "ecpubkey.der"
@@ -161,3 +193,17 @@ readPrivKey = do
           case runParseASN1 parsePrivKey asn1s of
             Left err   -> putStrLn $ "ASN1 parse error: " ++ err
             Right priv -> putStrLn ("Got: " ++ show priv)
+
+readSig :: IO ()
+readSig = do
+  signature <- LBS.readFile "sign.bin"
+  case decodeASN1 DER signature of
+    Left _ -> putStrLn "DER parse error."
+    Right asn1s -> do
+      case runParseASN1 parseSig asn1s of
+        Left err  -> putStrLn $ "ASN1 parse error: " ++ err
+        Right sig -> do
+          putStrLn ("Got: " ++ show sig)
+          putStrLn $
+            "Checking roundtrip: " ++
+            if encodeSig sig == signature then "Success!" else "Failure."
