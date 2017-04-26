@@ -3,7 +3,6 @@ syntax = "proto2";
 option java_package = "rabbits";
 option java_outer_classname = "ProofProtos";
 
-
 // m1
 message ProofReq {
 	required bytes uid = 1;
