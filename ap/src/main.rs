@@ -14,6 +14,8 @@ use hyper::server::{Server, Request, Response};
 use hyper::client::Client;
 use hyper::status::StatusCode;
 use hyper::uri::RequestUri;
+use hyper::header;
+use hyper::mime::{Mime, TopLevel, SubLevel};
 
 use rand::Rng;
 use rand::os::OsRng;
@@ -25,7 +27,7 @@ use ap::messages::{ProofReq, SignedProofReq,
                    ProofResp, SignedProofResp,
                    VaultMsg, SignedVaultMsg};
 
-static SERVER_URL: &'static str = "http://localhost:8080";
+static SERVER_URL: &'static str = "http://oxjhc.club";
 
 fn ping(seq: u64, sock: &UdpSocket) {
   // convert apid and seq to a byte array
@@ -90,14 +92,29 @@ fn gen_proof(nonce: Vec<u8>) {
   let client = Client::new();
   let (mut rdr, mut wtr) = UnixStream::pair().unwrap();
   sgn_msg.write_to_writer(&mut wtr);
+  wtr.shutdown(std::net::Shutdown::Write);
+  println!("sending vault to server");
   let resp = client.post(format!("{}{}", SERVER_URL, "/vault").as_str())
+    .header(header::ContentType("application/x-protobuf".parse().unwrap()))
     .body(&mut rdr)
     .send().unwrap();
-  if resp.status != hyper::Ok {
+  if resp.status == hyper::Ok {
     println!("vault successfully sent");
     // done.
   } else {
-    println!("the server fucked up.");
+    println!("error sending vault: {}", resp.status);
+  }
+}
+
+fn ping_server() {
+  let client = Client::new();
+  let resp = client.get(format!("{}{}", SERVER_URL, "/ping").as_str())
+    .send().unwrap();
+  if resp.status == hyper::Ok {
+    println!("server successfully pinged");
+    // done.
+  } else {
+    println!("the server is down :(.");
   }
 }
 
@@ -118,6 +135,9 @@ fn main() {
   for arg in env::args() {
     if arg == "-test" {
       gen_proof(vec![0x00]);
+      exit(0);
+    } else if arg == "-ping" {
+      ping_server();
       exit(0);
     }
   }
