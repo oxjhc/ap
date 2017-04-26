@@ -3,4 +3,4 @@ extern crate protobuf;
 
 mod galois_field;
 pub mod vault;
-mod messages;
+pub mod messages;

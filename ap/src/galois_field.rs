@@ -114,8 +114,8 @@ impl From<u32> for GF {
   }
 }
 
-impl Into<u16> for GF {
-  fn into(self) -> u16 {
-    self.0 as u16
+impl Into<u32> for GF {
+  fn into(self) -> u32 {
+    self.0 as u32
   }
 }

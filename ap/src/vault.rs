@@ -1,14 +1,14 @@
 use std::vec::Vec;
 use std::collections::HashSet;
-use std::ops::Fn;
 use rand::Rng;
 use rand::os::OsRng;
 
 use galois_field::GF;
 use galois_field::FIELD_SZ;
 
-#[derive(Eq, PartialEq, Hash)]
-pub struct Point<T>(T, T);
+use messages::{VaultMsg_Vault as Vault, VaultMsg_Vault_Point as Point};
+
+use protobuf;
 
 fn make_poly(locn_tag: Vec<u8>) -> Box<Fn(GF) -> GF> {
   let mut gf_locn_tag = Vec::with_capacity(locn_tag.len());
@@ -24,8 +24,16 @@ fn make_poly(locn_tag: Vec<u8>) -> Box<Fn(GF) -> GF> {
   })
 }
 
-pub fn make_vault(locn_tag: Vec<u8>, data_sz: usize, vault_sz: usize) -> HashSet<Point<GF>> {
-  let mut vault = HashSet::new();
+fn make_point(x: GF, y: GF) -> Point {
+  let mut pt = Point::new();
+  pt.set_x(x.into());
+  pt.set_y(y.into());
+  return pt;
+}
+
+pub fn make_vault(locn_tag: Vec<u8>, data_sz: usize, vault_sz: usize) -> Vault {
+  let mut vault = Vault::new();
+  let mut points = protobuf::RepeatedField::new();
 
   // bad bad bad unwrapping
   let mut rand = OsRng::new().unwrap();
@@ -39,7 +47,8 @@ pub fn make_vault(locn_tag: Vec<u8>, data_sz: usize, vault_sz: usize) -> HashSet
     let y = poly(x);
     xs.insert(x);
     ys.insert(y);
-    vault.insert(Point(x,y));
+
+    points.push(make_point(x, y));
   }
 
   for _ in data_sz..vault_sz {
@@ -51,8 +60,9 @@ pub fn make_vault(locn_tag: Vec<u8>, data_sz: usize, vault_sz: usize) -> HashSet
     while ys.contains(&y) { y = GF::new(rand.gen_range(0, FIELD_SZ)); }
     ys.insert(y);
 
-    vault.insert(Point(x,y));
+    points.push(make_point(x, y));
   }
 
+  vault.set_points(points);
   vault
 }

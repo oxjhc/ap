@@ -8,4 +8,5 @@ fn main() {
     .arg("-I").arg("../protos")
     .arg("../protos/messages.proto")
     .output().unwrap();
+  println!("{:?}", output.stderr);
 }
