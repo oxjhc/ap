@@ -16,6 +16,23 @@ import qualified Data.ByteString            as BS
 import qualified Data.ByteString.Lazy       as LBS
 import           Data.PEM
 
+-- OpenSSl notes:
+--
+-- Make private key:
+-- openssl ecparam -name prime256v1 -genkey -noout -out prime256v1-key.pem
+--
+-- Extract public key from private key:
+-- openssl ec -in prime256v1-key.pem -pubout -outform DER -out ecpubkey.der
+--
+-- Inspect a PEM:
+-- openssl asn1parse -inform PEM -in prime256v1-key.pem
+--
+-- Inspect a DER:
+-- openssl asn1parse -inform DER -in ecpubkey.der
+--
+-- Sign:
+-- openssl dgst -sha256 -sign prime256v1-key.pem test.txt > sign.bin
+
 p256 :: Curve
 p256 = getCurveByName SEC_p256r1
 

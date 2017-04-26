@@ -22,6 +22,7 @@ import           Database.Persist.Sqlite
 import           Models
 import           Network.Wai               hiding (vault)
 import           Network.Wai.Handler.Warp
+import           Network.Wai.Logger
 import           ProtoBuf
 import           Servant                   hiding (Vault)
 
@@ -37,7 +38,10 @@ type ServerAPI =
   :<|> "ping" :> Get '[PlainText] PingResp
 
 startApp :: FilePath -> IO ()
-startApp sqliteFile = run 8080 =<< makeApp sqliteFile
+startApp sqliteFile = do
+  withStdoutLogger $ \aplogger -> do
+    let settings = setPort 8080 $ setLogger aplogger defaultSettings
+    runSettings settings =<< makeApp sqliteFile
 
 makeApp :: FilePath -> IO Application
 makeApp sqliteFile = do
