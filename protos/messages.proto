@@ -42,7 +42,7 @@ message VaultMsg {
 }
 
 message SignedVaultMsg {
-	required VaultMsg = 1;
+	required VaultMsg vault_msg = 1;
 	required bytes sig = 2;
 }
 
