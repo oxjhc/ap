@@ -90,13 +90,10 @@ fn gen_proof(nonce: Vec<u8>) {
 
   // I really need a better error handling method
   let client = Client::new();
-  let (mut rdr, mut wtr) = UnixStream::pair().unwrap();
-  sgn_msg.write_to_writer(&mut wtr);
-  wtr.shutdown(std::net::Shutdown::Write);
   println!("sending vault to server");
   let resp = client.post(format!("{}{}", SERVER_URL, "/vault").as_str())
     .header(header::ContentType("application/x-protobuf".parse().unwrap()))
-    .body(&mut rdr)
+    .body(sgn_msg.write_to_bytes().unwrap().as_slice())
     .send().unwrap();
   if resp.status == hyper::Ok {
     println!("vault successfully sent");
