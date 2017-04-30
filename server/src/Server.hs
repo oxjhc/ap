@@ -40,7 +40,7 @@ type ServerAPI =
 startApp :: FilePath -> IO ()
 startApp sqliteFile = do
   withStdoutLogger $ \aplogger -> do
-    let settings = setPort 8080 $ setLogger aplogger defaultSettings
+    let settings = setPort 80 $ setLogger aplogger defaultSettings
     runSettings settings =<< makeApp sqliteFile
 
 makeApp :: FilePath -> IO Application
