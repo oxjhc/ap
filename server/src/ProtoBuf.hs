@@ -22,6 +22,7 @@ import           Data.ProtocolBuffers
 import           Data.ProtocolBuffers.Internal (Tag, WireField)
 import           Data.Serialize                hiding (decode, encode)
 import           Data.Word
+import           Debug.Trace
 import           GHC.Generics                  (Generic)
 import           Network.HTTP.Media
 import           Number
@@ -170,5 +171,5 @@ instance Encode a => MimeRender ProtoBuf a where
 instance Decode a => MimeUnrender ProtoBuf a where
   mimeUnrender _ bs =
     case runGetOrFail decodeMessage bs of
-      Left (_, _, err)  -> Left err
+      Left (_, _, _)    -> Left "Invalid protocol buffer"
       Right (_, _, res) -> Right res
