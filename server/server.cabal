@@ -36,6 +36,7 @@ library
                      , servant-docs
                      , servant-server
                      , wai
+                     , wai-logger
                      , warp
                      , containers
                      , unordered-containers

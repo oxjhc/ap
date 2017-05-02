@@ -174,9 +174,9 @@ data ProtoBuf
 instance Servant.Accept ProtoBuf where
   contentType _ = "application" // "x-protobuf"
 instance Encode a => MimeRender ProtoBuf a where
-  mimeRender _ = fmap hex toLazyByteString . encodeMessage
+  mimeRender _ = toLazyByteString . encodeMessage
 instance Decode a => MimeUnrender ProtoBuf a where
   mimeUnrender _ bs =
-    case runGetOrFail decodeMessage =<< unhex bs of
+    case runGetOrFail decodeMessage bs of
       Left (_, _, err)  -> Left err
       Right (_, _, res) -> Right res
