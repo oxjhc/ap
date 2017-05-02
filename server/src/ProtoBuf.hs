@@ -9,7 +9,17 @@
 {-# LANGUAGE ScopedTypeVariables   #-}
 {-# LANGUAGE TypeApplications      #-}
 
-module ProtoBuf where
+module ProtoBuf{-(
+    VaultMsg(..),
+    SignedVaultMsg(..),
+    LocnProof(..),
+    SignedLocnProof(..),
+    Token(..),
+    SignedToken(..),
+    ProtoBuf,
+    convertVault,
+    Vault(..),
+)-} where
 
 import           Data.Binary.Builder.Sized
 import           Data.Binary.Get
@@ -25,16 +35,8 @@ import           Data.Word
 import           GHC.Generics                  (Generic)
 import           Network.HTTP.Media
 import           Number
-import           ProtoBufConverter
 import           Servant                       hiding (Vault)
 import qualified Vault                         as V
-
--- Useful for defining the Encode and Decode instances
-encodeGen :: forall a b. (ProtoIso a b, Encode a) => b -> Builder
-encodeGen = encode @a . toProto @a @b
-decodeGen :: forall a b. (ProtoIso a b, Decode a) =>
-  HashMap Tag [WireField] -> Data.Binary.Get.Get b
-decodeGen = fmap (fromProto @a @b). decode @a
 
 {-
 //m4
@@ -74,6 +76,12 @@ data Vault = Vault
 
 instance Encode Vault
 instance Decode Vault
+
+convertVault :: Vault -> V.Vault PrimeField
+convertVault v = V.Vault $ map convertPoint $ getField $ points v
+    where convertPoint p = (toPF $ x p, toPF $ y p)
+          toPF :: Required a (Value Word32) -> PrimeField
+          toPF = fromInteger . toInteger . getField
 
 data VaultMsg = VaultMsg
   { vault   :: Required 1 (Message Vault)

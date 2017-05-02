@@ -19,11 +19,14 @@ import           Data.String.Conversions
 import           Database.Persist
 import           Database.Persist.Sql
 import           Database.Persist.Sqlite
-import           Models
 import           Network.Wai               hiding (vault)
 import           Network.Wai.Handler.Warp
-import           ProtoBuf
 import           Servant                   hiding (Vault)
+
+import           ProtoBuf
+import           Models
+import           Cryptography
+import           Verification
 
 newtype VaultResp = VaultResp String deriving (Eq, Show, MimeRender PlainText)
 newtype PingResp = PingResp String deriving (Eq, Show, MimeRender PlainText)
@@ -60,8 +63,6 @@ server pool = checkProof
   where
     newLine = putStr "\n"
     -- Function to check proof
-    valid :: ByteString -> Vault -> Bool
-    valid key vault = True
 
     checkProof :: SignedLocnProof -> Handler SignedToken
     checkProof signedProof = do
@@ -81,30 +82,33 @@ server pool = checkProof
                           messageVault . entityVal $ blob of
           Left (_, _, err)    -> throwError (err400 {errBody = "Corrupt."})
           Right (_, _, vault) -> do
-            let key = getField $ vault_key prf
-            if valid key vault then
-              return SignedToken
-                {token = putField Server.token, sig = putField "0"}
-            else
-              throwError (err400 {errBody = "Invalid proof."})
+            let signature = getField $ sig (signedProof :: SignedLocnProof)
+            proofResult <- liftIO $ valid prf (convertVault vault) (fromStrict signature)
+            case proofResult of
+              Just locnTag -> liftIO $ genSignedToken locnTag
+              Nothing      -> throwError (err400 {errBody = "Invalid proof."})
 
     receiveVaultMsg :: SignedVaultMsg -> Handler VaultResp
-    receiveVaultMsg signedMsg = liftIO $ do
+    receiveVaultMsg signedMsg = do
       let msg = getField . vault_msg $ signedMsg
-      res <- flip runSqlPersistMPool pool $ do
-        let vault'        = toStrict . toLazyByteString . encodeMessage $
-                              (getField . vault $ msg)
-            uid'          = getField $ uid     (msg :: VaultMsg)
-            unonce'       = getField $ unonce  (msg :: VaultMsg)
-            apid'         = getField $ apid    (msg :: VaultMsg)
-            apnonce'      = getField $ apnonce (msg :: VaultMsg)
-            (Fixed time') = getField $ time    (msg :: VaultMsg)
-        insertBy (Message vault' uid' unonce' apid' apnonce' (fromIntegral time'))
-      putStrLn "Received message." >> print msg >> newLine
-      case res of
-        Left _  -> putStrLn "WARNING: Duplicate exists, did not write."
-        Right _ -> return ()
-      return (VaultResp $ show msg)
+      if not $ checkVaultSignature msg $ fromStrict $ getField $ sig (signedMsg :: SignedVaultMsg)
+        then throwError (err400 {errBody = "Invalud signature."})
+        else return ()
+      liftIO $ do
+        res <- flip runSqlPersistMPool pool $ do
+          let vault'        = toStrict . toLazyByteString . encodeMessage $
+                                (getField . vault $ msg)
+              uid'          = getField $ uid     (msg :: VaultMsg)
+              unonce'       = getField $ unonce  (msg :: VaultMsg)
+              apid'         = getField $ apid    (msg :: VaultMsg)
+              apnonce'      = getField $ apnonce (msg :: VaultMsg)
+              (Fixed time') = getField $ time    (msg :: VaultMsg)
+          insertBy (Message vault' uid' unonce' apid' apnonce' (fromIntegral time'))
+        putStrLn "Received message." >> print msg >> newLine
+        case res of
+          Left _  -> putStrLn "WARNING: Duplicate exists, did not write."
+          Right _ -> return ()
+        return (VaultResp $ show msg)
 
 -- A valid SignedLocnProof that has this as the payload is:
 -- 0A200A033132331204313233341A01782204353637382A0179314000000000000000120130
@@ -116,12 +120,4 @@ proof = LocnProof
   , apid = putField "5678"
   , apnonce = putField "y"
   , time = putField 64
-  }
-
--- A valid SignedToken which has this as the payload is:
--- 0A090A0461626364120130120130
-token :: Token
-token = Token
-  { vnonce = putField "abcd"
-  , locn_tag = putField "0"
   }

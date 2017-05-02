@@ -15,6 +15,10 @@ import           Data.ASN1.Types
 import qualified Data.ByteString            as BS
 import qualified Data.ByteString.Lazy       as LBS
 import           Data.PEM
+import           Control.Monad
+import           Data.Bifunctor (first)
+
+import           ProtoBuf (VaultMsg)
 
 p256 :: Curve
 p256 = getCurveByName SEC_p256r1
@@ -72,8 +76,8 @@ test = do
 --   by 0x04 and the compressed form is indicated by either 0x02 or
 --   0x03 (see 2.3.3 in [SEC1]).  The public key MUST be rejected if
 --   any other value is included in the first octet.
-parsePubKey :: ParseASN1 PublicKey
-parsePubKey = do
+pubKeyParser :: ParseASN1 PublicKey
+pubKeyParser = do
   getNext -- Start Sequence for SubjectPublicKeyInfo
   getNext -- Start Sequence for AlgorithmIdentifier
   getNext >>= \case
@@ -124,8 +128,8 @@ encodePubKey pk = encodeASN1 DER asn1
 --   parameters [0] ECParameters {{ NamedCurve }} OPTIONAL,
 --   publicKey  [1] BIT STRING OPTIONAL
 -- }
-parsePrivKey :: ParseASN1 PrivateKey
-parsePrivKey = do
+privKeyParser :: ParseASN1 PrivateKey
+privKeyParser = do
   getNext -- Start Sequence
   getNext -- version
   privNum <- getNext >>= \case
@@ -142,8 +146,8 @@ parsePrivKey = do
 -- }
 --
 -- Originally in ANSI X9.62-1998
-parseSig :: ParseASN1 Signature
-parseSig = do
+sigParser :: ParseASN1 Signature
+sigParser = do
   getNext -- Start Sequence
   r <- getNext >>= \case
     IntVal r -> return r
@@ -165,45 +169,46 @@ encodeSig sig = encodeASN1 DER asn1
       , End Sequence
       ]
 
+parsePubKey :: LBS.ByteString -> Either String PublicKey
+parsePubKey = (first ("ASN1 parse error: " ++ ) . runParseASN1 pubKeyParser)
+          <=< (first (const "DER parse error.") . decodeASN1 DER)
+
+parsePrivKey :: LBS.ByteString -> Either String PrivateKey
+parsePrivKey = (first ("ASN1 parse error: " ++ ) . runParseASN1 privKeyParser)
+           <=< (first (const "DER parse error.") . decodeASN1 DER . LBS.fromStrict . pemContent)
+           <=< ((foldr ((Right .) . const) (Left "No PEMs.") =<<) 
+            .  (first (const "PEM parse error.") . pemParseLBS))
+
+parseSig :: LBS.ByteString -> Either String Signature
+parseSig = (first ("ASN1 parse error: " ++ ) . runParseASN1 sigParser)
+       <=< (first (const "DER parse error.") . decodeASN1 DER)
+
 
 readPubKey :: IO ()
 readPubKey = do
   pubKey <- LBS.readFile "ecpubkey.der"
-  case decodeASN1 DER pubKey of
-    Left _ -> putStrLn "DER parse error."
-    Right asn1s -> do
-      case runParseASN1 parsePubKey asn1s of
-        Left err  -> putStrLn $ "ASN1 parse error: " ++ err
-        Right pub -> do
-          putStrLn ("Got: " ++ show pub)
-          putStrLn $
-            "Checking roundtrip: " ++
-            if encodePubKey pub == pubKey then "Success!" else "Failure."
+  case parsePubKey pubKey of
+    Left err  -> putStrLn err
+    Right pub -> do
+      putStrLn ("Got: " ++ show pub)
+      putStrLn $
+        "Checking roundtrip: " ++
+        if encodePubKey pub == pubKey then "Success!" else "Failure."
 
 readPrivKey :: IO ()
 readPrivKey = do
   privKey <- LBS.readFile "prime256v1-key.pem"
-  case pemParseLBS privKey of
-    Left _ -> putStrLn "PEM parse error."
-    Right [] -> putStrLn "No PEMs."
-    Right (pem:_) -> do
-      case decodeASN1 DER (LBS.fromStrict $ pemContent pem) of
-        Left _ -> putStrLn "DER parse error."
-        Right asn1s -> do
-          case runParseASN1 parsePrivKey asn1s of
-            Left err   -> putStrLn $ "ASN1 parse error: " ++ err
-            Right priv -> putStrLn ("Got: " ++ show priv)
+  case parsePrivKey privKey of
+    Left  err   -> putStrLn err
+    Right priv  -> putStrLn ("Got: " ++ show priv)
 
 readSig :: IO ()
 readSig = do
   signature <- LBS.readFile "sign.bin"
-  case decodeASN1 DER signature of
-    Left _ -> putStrLn "DER parse error."
-    Right asn1s -> do
-      case runParseASN1 parseSig asn1s of
-        Left err  -> putStrLn $ "ASN1 parse error: " ++ err
-        Right sig -> do
-          putStrLn ("Got: " ++ show sig)
-          putStrLn $
-            "Checking roundtrip: " ++
-            if encodeSig sig == signature then "Success!" else "Failure."
+  case parseSig signature of
+    Left err  -> putStrLn $ "ASN1 parse error: " ++ err
+    Right sig -> do
+      putStrLn ("Got: " ++ show sig)
+      putStrLn $
+        "Checking roundtrip: " ++
+        if encodeSig sig == signature then "Success!" else "Failure."

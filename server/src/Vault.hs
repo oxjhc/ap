@@ -2,7 +2,8 @@
 
 module Vault(
     Vault(..),
-    Polynomial(..)
+    Polynomial(..),
+    openVault
 ) where
 
 import qualified Data.Set as Set
