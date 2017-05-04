@@ -184,6 +184,7 @@ impl Handler for Dormouse {
     match req.uri.clone() {
       RequestUri::AbsolutePath(ref path) => match (&req.method, &path[..]) {
         (&hyper::Post, "/proof_req") => {
+          println!("received proof req");
           // lock proof lock, ensuring only one proof generation occurs at one time
           let mut prf = self.prflock.lock().unwrap();
           if prf.has_vault_key() {
@@ -247,6 +248,7 @@ impl Handler for Dormouse {
           }
         },
         (&hyper::Get, "/proof") => {
+          println!("received proof");
           let prf = self.prflock.lock().unwrap();
           if !prf.has_vault_key() {
             *res.status_mut() = StatusCode::BadRequest;
@@ -266,11 +268,13 @@ impl Handler for Dormouse {
           res.send(sgn_prf.write_to_bytes().unwrap().as_slice()).unwrap();
         },
         _ => {
+          println!("received something unknown: {} on {}", req.method, path);
           *res.status_mut() = StatusCode::NotFound;
           res.send(b"No such resource! Don't be stupid!").unwrap();
         }
       },
       _ => {
+        println!("received weird url");
         *res.status_mut() = StatusCode::NotImplemented;
         res.send(b"This server doesn't know how to deal with proxies and shit.").unwrap();
       }
