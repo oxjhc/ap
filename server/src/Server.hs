@@ -70,7 +70,7 @@ server pool = checkProof
     checkProof :: SignedLocnProof -> Handler SignedToken
     checkProof signedProof = do
       let prf  = getField $ locnproof signedProof
-      liftIO (putStrLn "Checking proof." >> print signedProof >> newLine)
+      --liftIO (putStrLn "Checking proof." >> (print $ showProto signedProof) >> newLine)
       res <- liftIO $ flip runSqlPersistMPool pool $ do
         let uid'          = getField $ uid     (prf :: LocnProof)
             unonce'       = getField $ unonce  (prf :: LocnProof)
@@ -104,11 +104,11 @@ server pool = checkProof
             apnonce'      = getField $ apnonce (msg :: VaultMsg)
             (Fixed time') = getField $ time    (msg :: VaultMsg)
         insertBy (Message vault' uid' unonce' apid' apnonce' (fromIntegral time'))
-      putStrLn "Received message." >> print msg >> newLine
-      case res of
-        Left _  -> putStrLn "WARNING: Duplicate exists, did not write."
-        Right _ -> return ()
-      return (VaultResp $ show msg)
+      -- putStrLn "Received message." >> print msg >> newLine
+      -- case res of
+      --   Left _  -> putStrLn "WARNING: Duplicate exists, did not write."
+      --   Right _ -> return ()
+      return (VaultResp $ "Success!")
 
 -- A valid SignedLocnProof that has this as the payload is:
 -- 0A200A033132331204313233341A01782204353637382A0179314000000000000000120130
