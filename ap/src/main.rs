@@ -52,8 +52,8 @@ fn ping(sock: &UdpSocket) {
     (seq >> 56) as u8, (seq >> 48) as u8, (seq >> 40) as u8, (seq >> 32) as u8,
     (seq >> 24) as u8, (seq >> 16) as u8, (seq >> 8) as u8, seq as u8
   ];
-  match sock.send_to(&data, "255.255.255.255:1832") {
-    Ok(_) => (),
+  match sock.send_to(&data, "192.168.49.255:1832") {
+    Ok(n) => if n == 8 { println!("pinged with seqid {}", seq); },
     Err(err) => println!("{}", err)
   }
 }
@@ -234,13 +234,16 @@ fn main() {
 
   for arg in env::args() {
     if arg == "-test" {
+      println!("sending test location proof");
       dormouse.gen_proof(&[0x00], &[0x11], &[0x22]);
       exit(0);
     } else if arg == "-ping" {
+      println!("pinging server");
       ping_server();
       exit(0);
     }
   }
 
+  println!("starting dormouse");
   Server::http("0.0.0.0:1865").unwrap().handle(dormouse).unwrap();
 }
