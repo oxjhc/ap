@@ -1,18 +1,19 @@
 extern crate ap;
-extern crate chan;
 extern crate hyper;
 extern crate rand;
 extern crate openssl;
 extern crate protobuf;
+extern crate toml;
 //extern crate wpactrl;
 
 use std::{thread, time};
-use std::net::{UdpSocket, SocketAddr};
+use std::net::UdpSocket;
 use std::env;
 use std::process::exit;
 use std::sync::{Mutex};
-
-use chan::{Sender, Receiver};
+use std::fs::File;
+use std::io::Read;
+use std::collections::BTreeMap as Map;
 
 use hyper::server::{Server, Handler, Request, Response};
 use hyper::client::Client;
@@ -23,6 +24,7 @@ use hyper::header;
 use openssl::bn::BigNumContext;
 use openssl::sign::{Signer, Verifier};
 use openssl::ec::{EcGroup, EcPoint, EcKey};
+use openssl::dsa::Dsa;
 use openssl::pkey::PKey;
 use openssl::nid::X9_62_PRIME256V1 as CURVE;
 use openssl::hash::MessageDigest;
@@ -35,6 +37,8 @@ use rand::os::OsRng;
 
 use protobuf::Message;
 
+use toml::Value;
+
 use ap::vault::make_vault;
 use ap::messages::{SignedProofReq,
                    ProofResp, SignedProofResp,
@@ -45,6 +49,25 @@ static SERVER_URL: &'static str = "http://oxjhc.club";
 //static seq_ids: [u64; 2] = [ 0, 0 ]
 static mut SEQID: i64 = 0;
 
+#[derive(Debug)]
+enum Error {
+  ConfErr(String),
+  IoErr(std::io::Error),
+  TomlDeErr(toml::de::Error)
+}
+
+impl From<std::io::Error> for Error {
+  fn from(err: std::io::Error) -> Self {
+    Error::IoErr(err)
+  }
+}
+
+impl From<toml::de::Error> for Error {
+  fn from(err: toml::de::Error) -> Self {
+    Error::TomlDeErr(err)
+  }
+}
+
 fn ping(sock: &UdpSocket) {
   let seq = unsafe { SEQID };
   // convert apid and seq to a byte array
@@ -53,7 +76,7 @@ fn ping(sock: &UdpSocket) {
     (seq >> 24) as u8, (seq >> 16) as u8, (seq >> 8) as u8, seq as u8
   ];
   match sock.send_to(&data, "192.168.49.255:1832") {
-    Ok(n) => if n == 8 { println!("pinged with seqid {}", seq); },
+    Ok(n) => if n == 8 { /*println!("pinged with seqid {}", seq);*/ },
     Err(err) => println!("{}", err)
   }
 }
@@ -76,28 +99,42 @@ fn spawn_pinger() {
 
 
 fn key_from_bytes(bytes: &[u8]) -> Result<PKey, ErrorStack> {
-  let group = EcGroup::from_curve_name(CURVE).unwrap();
-  let mut ctx = BigNumContext::new().unwrap();
-  let point = EcPoint::from_bytes(&group, bytes, &mut ctx).unwrap();
-  let key = try!(EcKey::from_public_key(&group, &point));
-  PKey::from_ec_key(key)
+  //let group = EcGroup::from_curve_name(CURVE).unwrap();
+  //let mut ctx = BigNumContext::new().unwrap();
+  //let point = EcPoint::from_bytes(&group, bytes, &mut ctx).unwrap();
+  //let key = EcKey::from_public_key(&group, &point)?;
+  let key = Dsa::public_key_from_der(bytes)?;
+  PKey::from_dsa(key)
 }
 
 struct Dormouse {
   key: PKey,
-  prflock: Mutex<()>,
-  tx: Sender<()>,
-  rx: Receiver<()>
+  prflock: Mutex<LocnProof>,
+  cfg: Map<String, Value>
 }
 
 impl Dormouse {
   fn new(key: PKey) -> Dormouse {
-    let lock = Mutex::new(());
-    let (tx, rx) = chan::sync(0);
-    Dormouse{key: key, prflock: lock, tx: tx, rx: rx}
+    let prflock = Mutex::new(LocnProof::new());
+    let cfg = Dormouse::read_cfg().unwrap();
+    Dormouse{key, prflock, cfg}
   }
 
-  fn gen_proof(&self, uid: &[u8], unonce: &[u8], nonce: &[u8]) {
+  fn read_cfg() -> Result<Map<String, Value>, Error> {
+    let mut cfg_file = File::open("/etc/dormouse/config.toml")?;
+    let mut contents = String::new();
+    cfg_file.read_to_string(&mut contents)?;
+    match contents.parse::<Value>() {
+      Ok(res) => match res.as_table() {
+        Some(table) => Ok(table.clone()),
+        None => Err(Error::ConfErr("not a table".to_string()))
+      },
+      Err(err) => Err(Error::TomlDeErr(err))
+    }
+  }
+
+  fn gen_proof(&self, uid: &[u8], unonce: &[u8], nonce: &[u8], time: u64) {
+    println!("starting gen_proof");
     let locn_tag = vec![ 243, 122, 33, 214 ];
     let vault = make_vault(locn_tag, 10, 100);
 
@@ -105,9 +142,10 @@ impl Dormouse {
     msg.set_vault(vault);
     msg.set_uid(uid.to_vec());
     msg.set_unonce(unonce.to_vec());
+    println!("here");
     msg.set_apid(self.key.public_key_to_der().unwrap());
     msg.set_apnonce(nonce.to_vec());
-    msg.set_time(time::SystemTime::now().duration_since(time::UNIX_EPOCH).unwrap().as_secs());
+    msg.set_time(time);
 
     let mut signer = Signer::new(MessageDigest::sha256(), &self.key).unwrap();
     signer.update(msg.write_to_bytes().unwrap().as_slice()).unwrap();
@@ -121,10 +159,17 @@ impl Dormouse {
     // I really need a better error handling method
     let client = Client::new();
     println!("sending vault to server");
-    let resp = client.post(format!("{}{}", SERVER_URL, "/vault").as_str())
+    let resp =
+      match client.post(format!("{}{}", SERVER_URL, "/vault").as_str())
       .header(header::ContentType("application/x-protobuf".parse().unwrap()))
       .body(sgn_msg.write_to_bytes().unwrap().as_slice())
-      .send().unwrap();
+      .send() {
+        Ok(res) => res,
+        Err(err) => {
+          println!("Error sending vault to server: {}", err);
+          return;
+        }
+      };
     if resp.status == hyper::Ok {
       println!("vault successfully sent");
       // done.
@@ -140,7 +185,12 @@ impl Handler for Dormouse {
       RequestUri::AbsolutePath(ref path) => match (&req.method, &path[..]) {
         (&hyper::Post, "/proof_req") => {
           // lock proof lock, ensuring only one proof generation occurs at one time
-          let _ = self.prflock.lock().unwrap();
+          let mut prf = self.prflock.lock().unwrap();
+          if prf.has_vault_key() {
+            *res.status_mut() = StatusCode::BadRequest;
+            res.send(b"Proof req was already received").unwrap();
+            return;
+          }
 
           let mut sgn_prf_req: SignedProofReq = match protobuf::parse_from_reader(&mut req) {
             Ok(res) => res,
@@ -164,8 +214,8 @@ impl Handler for Dormouse {
           verifier.update(prf_req.write_to_bytes().unwrap().as_slice()).unwrap();
           if verifier.finish(sgn_prf_req.take_sig().as_slice()).unwrap() {
             let mut prf_res = ProofResp::new();
-            prf_res.set_uid(prf_req.take_uid());
-            prf_res.set_unonce(prf_req.take_unonce());
+            prf_res.set_uid(prf_req.get_uid().to_vec());
+            prf_res.set_unonce(prf_req.get_unonce().to_vec());
 
             let mut signer = Signer::new(MessageDigest::sha256(), &self.key).unwrap();
             signer.update(prf_res.write_to_bytes().unwrap().as_slice()).unwrap();
@@ -182,23 +232,38 @@ impl Handler for Dormouse {
             let mut rand = OsRng::new().unwrap();
             for _ in 1..10 { nonce.push(rand.gen()); }
 
-            self.gen_proof(prf_res.get_uid(), prf_res.get_unonce(), nonce.as_slice());
+            let time = time::SystemTime::now().duration_since(time::UNIX_EPOCH).unwrap().as_secs();
+            self.gen_proof(prf_res.get_uid(), prf_res.get_unonce(), nonce.as_slice(), time);
 
-            self.rx.recv();
+            prf.set_vault_key(vec![0x00]);
+            prf.set_uid(prf_req.take_uid());
+            prf.set_unonce(prf_req.take_unonce());
+            prf.set_apid(self.key.public_key_to_der().unwrap());
+            prf.set_apnonce(nonce);
+            prf.set_time(time);
           } else {
             *res.status_mut() = StatusCode::Forbidden;
             res.send(b"That signature doesn't match your public key!").unwrap();
           }
         },
         (&hyper::Get, "/proof") => {
-          match self.prflock.try_lock() {
-            Ok(_) => {
-              *res.status_mut() = StatusCode::Unauthorized;
-              res.send(b"no request in progress").unwrap();
-            },
-            Err(_) => {}
+          let prf = self.prflock.lock().unwrap();
+          if !prf.has_vault_key() {
+            *res.status_mut() = StatusCode::BadRequest;
+            res.send(b"Proof req was not received").unwrap();
+            return;
           }
-          self.tx.send(());
+
+          // get rssi and crap.
+
+          let mut signer = Signer::new(MessageDigest::sha256(), &self.key).unwrap();
+          signer.update(prf.write_to_bytes().unwrap().as_slice()).unwrap();
+          let mut sgn_prf = SignedLocnProof::new();
+          sgn_prf.set_locnproof(prf.clone());
+          sgn_prf.set_sig(signer.finish().unwrap());
+
+          *res.status_mut() = StatusCode::Ok;
+          res.send(sgn_prf.write_to_bytes().unwrap().as_slice()).unwrap();
         },
         _ => {
           *res.status_mut() = StatusCode::NotFound;
@@ -207,7 +272,7 @@ impl Handler for Dormouse {
       },
       _ => {
         *res.status_mut() = StatusCode::NotImplemented;
-        res.send(b"Please post to this server.").unwrap();
+        res.send(b"This server doesn't know how to deal with proxies and shit.").unwrap();
       }
     }
   }
@@ -226,7 +291,12 @@ fn ping_server() {
 }
 
 fn main() {
-  let key = EcKey::from_curve_name(CURVE).unwrap();
+  let group = EcGroup::from_curve_name(CURVE).unwrap();
+  //let mut ctx = BigNumContext::new().unwrap();
+  //let point = EcPoint::from_bytes(&group, &public_key, &mut ctx).unwrap();
+  //let key = EcKey::from_public_key(&group, &point).unwrap();
+  let key = EcKey::generate(&group).unwrap();
+  key.check_key().unwrap();
   let pkey = PKey::from_ec_key(key).unwrap();
   let dormouse = Dormouse::new(pkey);
 
@@ -235,7 +305,7 @@ fn main() {
   for arg in env::args() {
     if arg == "-test" {
       println!("sending test location proof");
-      dormouse.gen_proof(&[0x00], &[0x11], &[0x22]);
+      dormouse.gen_proof(&[0x00], &[0x11], &[0x22], time::SystemTime::now().duration_since(time::UNIX_EPOCH).unwrap().as_secs());
       exit(0);
     } else if arg == "-ping" {
       println!("pinging server");
@@ -245,5 +315,5 @@ fn main() {
   }
 
   println!("starting dormouse");
-  Server::http("0.0.0.0:1865").unwrap().handle(dormouse).unwrap();
+  Server::http("0.0.0.0:80").unwrap().handle(dormouse).unwrap();
 }
