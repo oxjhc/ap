@@ -115,10 +115,11 @@ server pool = checkProof
         return (VaultResp $ "Success!")
 
 -- A valid SignedLocnProof that has this as the payload is:
--- 0A200A033132331204313233341A01782204353637382A0179314000000000000000120130
+--
 proof :: LocnProof
 proof = LocnProof
   { vault_key = putField "123"
+  , ekey = putField "abc"
   , uid = putField "1234"
   , unonce = putField "x"
   , apid = putField "5678"

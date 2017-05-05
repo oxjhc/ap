@@ -1,5 +1,8 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE RankNTypes            #-}
+{-# LANGUAGE TypeApplications      #-}
+{-# LANGUAGE TypeFamilies          #-}
 module Main (main) where
 
 import           Control.Monad.Logger       (runNoLoggingT)
@@ -65,11 +68,12 @@ signedVaultMsg = SignedVaultMsg
 proof :: LocnProof
 proof = LocnProof
   { vault_key = putField "123"
-  , uid = uid (vaultMsg :: VaultMsg)
-  , unonce = unonce (vaultMsg :: VaultMsg)
-  , apid = apid (vaultMsg :: VaultMsg)
-  , apnonce = apnonce (vaultMsg :: VaultMsg)
-  , time = time (vaultMsg :: VaultMsg)
+  , ekey = putField "5678"
+  , uid = putField $ getField $ uid (vaultMsg :: VaultMsg)
+  , unonce = putField $ getField $ unonce (vaultMsg :: VaultMsg)
+  , apid = putField $ getField $ apid (vaultMsg :: VaultMsg)
+  , apnonce = putField $ getField $ apnonce (vaultMsg :: VaultMsg)
+  , time = putField $ getField $ time (vaultMsg :: VaultMsg)
   }
 
 
@@ -82,10 +86,11 @@ signedProof = SignedLocnProof
 wrongProof :: LocnProof
 wrongProof = LocnProof
   { vault_key = putField "123"
-  , uid = uid (vaultMsg :: VaultMsg)
-  , unonce = unonce (vaultMsg :: VaultMsg)
-  , apid = apid (vaultMsg :: VaultMsg)
-  , apnonce = apnonce (vaultMsg :: VaultMsg)
+  , ekey = putField "abc"
+  , uid = putField $ getField $ uid (vaultMsg :: VaultMsg)
+  , unonce = putField $ getField $ unonce (vaultMsg :: VaultMsg)
+  , apid = putField $ getField $ apid (vaultMsg :: VaultMsg)
+  , apnonce = putField $ getField $ apnonce (vaultMsg :: VaultMsg)
   , time = putField . (+1) . getField $ time (vaultMsg :: VaultMsg)
   }
 

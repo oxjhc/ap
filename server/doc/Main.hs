@@ -26,6 +26,7 @@ import           Vault                (Vault (..))
 proof :: LocnProof
 proof = LocnProof
   { vault_key = putField "123"
+  , ekey = putField "abc"
   , uid = putField "1234"
   , unonce = putField "x"
   , apid = putField "5678"

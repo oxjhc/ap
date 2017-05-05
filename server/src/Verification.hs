@@ -32,7 +32,7 @@ import           Vault
 valid :: LocnProof -> Vault PrimeField -> LBS.ByteString -> IO (Maybe (Polynomial PrimeField))
 valid m3 vault sig' = (\vPrivKey ->
     let key' = getField $ vault_key m3
-        apKey' = LBS.fromStrict $ getField $ apid (m3 :: LocnProof)
+        apKey' = LBS.fromStrict $ getField $ ekey (m3 :: LocnProof)
         key = (\apk -> maybeCryptoError $ decodeVaultKey <$> decrypt apk vPrivKey key') =<< apKey
         apKey = either (const Nothing) Just $ parsePubKey apKey'
         locnTag = openVault vault <$> key

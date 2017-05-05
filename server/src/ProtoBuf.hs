@@ -123,11 +123,12 @@ message SignedLocnProof {
 
 data LocnProof = LocnProof
   { vault_key :: Required 1 (Value ByteString)
-  , uid       :: Required 2 (Value ByteString)
-  , unonce    :: Required 3 (Value ByteString)
-  , apid      :: Required 4 (Value ByteString)
-  , apnonce   :: Required 5 (Value ByteString)
-  , time      :: Required 6 (Value (Fixed Word64))
+  , ekey      :: Required 2 (Value ByteString)
+  , uid       :: Required 3 (Value ByteString)
+  , unonce    :: Required 4 (Value ByteString)
+  , apid      :: Required 5 (Value ByteString)
+  , apnonce   :: Required 6 (Value ByteString)
+  , time      :: Required 7 (Value (Fixed Word64))
   } deriving (Generic, Show, Eq)
 
 instance Encode LocnProof
