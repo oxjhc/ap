@@ -31,7 +31,7 @@ fn make_point(x: GF, y: GF) -> Point {
   return pt;
 }
 
-pub fn make_vault(locn_tag: Vec<u8>, data_sz: usize, vault_sz: usize) -> Vault {
+pub fn make_vault(locn_tag: Vec<u8>, data_sz: usize, vault_sz: usize) -> (Vault, Vec<u16>) {
   let mut vault = Vault::new();
   let mut points = protobuf::RepeatedField::new();
 
@@ -39,12 +39,15 @@ pub fn make_vault(locn_tag: Vec<u8>, data_sz: usize, vault_sz: usize) -> Vault {
   let mut rand = OsRng::new().unwrap();
 
   let poly = make_poly(locn_tag);
+  let mut key = Vec::with_capacity(data_sz);
   let mut xs = HashSet::<GF>::new();
   let mut ys = HashSet::<GF>::new();
   for _ in 0..data_sz {
     let mut x = GF::new(rand.gen_range(0, FIELD_SZ));
     while xs.contains(&x) { x = GF::new(rand.gen_range(0, FIELD_SZ)); }
     let y = poly(x);
+    let xi: u16 = x.into();
+    key.push(xi.to_be());
     xs.insert(x);
     ys.insert(y);
 
@@ -64,5 +67,5 @@ pub fn make_vault(locn_tag: Vec<u8>, data_sz: usize, vault_sz: usize) -> Vault {
   }
 
   vault.set_points(points);
-  vault
+  (vault, key)
 }
