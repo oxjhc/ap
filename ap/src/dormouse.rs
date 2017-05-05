@@ -140,8 +140,9 @@ impl Dormouse {
 
     let rand = rand::SystemRandom::new();
     let ekey = agreement::EphemeralPrivateKey::generate(&agreement::ECDH_P256, &rand).unwrap();
-    let mut pubekey = vec![0u8; ekey.public_key_len()];
-    ekey.compute_public_key(&mut pubekey).unwrap();
+    let mut pubept = vec![0u8; ekey.public_key_len()];
+    ekey.compute_public_key(&mut pubept).unwrap();
+    let pubekey = PubKey::from_point(pubept.as_slice()).unwrap();
     let vid = PubKey::from_file(&self.cfg._t_vid_file).unwrap().to_point_bytes().unwrap();
     let vid = Input::from(vid.as_slice());
 
@@ -162,7 +163,7 @@ impl Dormouse {
     };
 
     prf.set_vault_key(vault_key);
-    prf.set_ekey(pubekey);
+    prf.set_ekey(pubekey.pub_to_der().unwrap());
     prf.set_time(time);
 
     let sig = self.cfg.key.sign(MD::sha256(), p2b!(prf)).unwrap();
@@ -359,8 +360,9 @@ impl Handler for Dormouse {
 
             let rand = rand::SystemRandom::new();
             let ekey = etry!(agreement::EphemeralPrivateKey::generate(&agreement::ECDH_P256, &rand));
-            let mut pubekey = vec![0u8; ekey.public_key_len()];
-            etry!(ekey.compute_public_key(&mut pubekey));
+            let mut pubept = vec![0u8; ekey.public_key_len()];
+            etry!(ekey.compute_public_key(&mut pubept));
+            let pubekey = etry!(PubKey::from_point(pubept.as_slice()));
             let ref vid = match *vidg {
               Some(ref v) => v,
               None => {
@@ -390,7 +392,7 @@ impl Handler for Dormouse {
               }
             };
             prf.set_vault_key(vault_key);
-            prf.set_ekey(pubekey);
+            prf.set_ekey(etry!(pubekey.pub_to_der()));
             prf.set_time(time);
 
             let sig = self.cfg.key.sign(MD::sha256(), p2b!(prf)).unwrap();

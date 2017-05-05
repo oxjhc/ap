@@ -8,7 +8,7 @@ use self::openssl::bn::BigNumContext;
 use self::openssl::pkey::PKey;
 use self::openssl::sign::{Signer, Verifier};
 use self::openssl::nid::X9_62_PRIME256V1 as CURVE;
-use self::openssl::ec::{POINT_CONVERSION_UNCOMPRESSED, EcGroup};
+use self::openssl::ec::{POINT_CONVERSION_UNCOMPRESSED, EcPoint, EcGroup, EcKey};
 use self::openssl::hash::MessageDigest;
 
 use error::Error;
@@ -64,6 +64,17 @@ impl PubKey {
     Ok(PubKey::new(PKey::public_key_from_pem(
       format!("-----BEGIN PUBLIC KEY-----\n{}\n-----END PUBLIC KEY-----",
               base64::encode(der)).into_bytes().as_slice())?))
+  }
+
+  pub fn from_point(bytes: &[u8]) -> Result<PubKey, Error> {
+    let group = EcGroup::from_curve_name(CURVE)?;
+    let mut ctx = BigNumContext::new()?;
+    let point = EcPoint::from_bytes(&group, bytes, &mut ctx)?;
+    Ok(PubKey::new(PKey::from_ec_key(EcKey::from_public_key(&group, &point)?)?))
+  }
+
+  pub fn pub_to_der(&self) -> Result<Vec<u8>, Error> {
+    Ok(self.pkey.public_key_to_der()?)
   }
 
   pub fn verify(&self, digest: MessageDigest, msg: &[u8], sig: &[u8]) -> Result<bool, Error> {
