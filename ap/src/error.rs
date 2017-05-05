@@ -6,11 +6,17 @@ use std::fmt::{Display, Formatter};
 
 #[derive(Debug)]
 pub enum Error {
-  ConfErr(String),
+  CfgErr(String),
   IoErr(std::io::Error),
   TomlDeErr(toml::de::Error),
   OpenSslErr(openssl::error::ErrorStack),
   StrErr(String)
+}
+
+impl Error {
+  pub fn cfg_err(str: &str) -> Error {
+    Error::CfgErr(str.to_string())
+  }
 }
 
 impl From<std::io::Error> for Error {
@@ -34,7 +40,7 @@ impl From<openssl::error::ErrorStack> for Error {
 impl Display for Error {
   fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
     match self {
-      &Error::ConfErr(ref s) => s.fmt(f),
+      &Error::CfgErr(ref s) => s.fmt(f),
       &Error::IoErr(ref e) => e.fmt(f),
       &Error::TomlDeErr(ref e) => e.fmt(f),
       &Error::OpenSslErr(ref e) => e.fmt(f),

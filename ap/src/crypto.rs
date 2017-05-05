@@ -48,7 +48,7 @@ impl PubKey {
     PubKey{pkey}
   }
 
-  pub fn from_file(fname: String) -> Result<PubKey, Error> {
+  pub fn from_file(fname: &String) -> Result<PubKey, Error> {
     let mut key_file = File::open(fname)?;
     let mut contents = String::new();
     key_file.read_to_string(&mut contents).unwrap();

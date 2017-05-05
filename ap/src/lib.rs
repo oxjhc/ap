@@ -1,10 +1,13 @@
-extern crate rand;
 extern crate protobuf;
+extern crate openssl;
 
 mod galois_field;
-pub mod error;
+mod error;
+mod config;
+mod dormouse;
 pub mod vault;
 pub mod messages;
 pub mod crypto;
 
-pub use error::Error;
+pub use config::Config;
+pub use dormouse::Dormouse;

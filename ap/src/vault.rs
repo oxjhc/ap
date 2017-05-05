@@ -1,7 +1,10 @@
+extern crate rand;
+
 use std::vec::Vec;
 use std::collections::HashSet;
-use rand::Rng;
-use rand::os::OsRng;
+
+use self::rand::Rng;
+use self::rand::os::OsRng;
 
 use galois_field::GF;
 use galois_field::FIELD_SZ;
