@@ -38,21 +38,6 @@ use config::Config;
 
 static mut SEQID: i64 = 0;
 
-macro_rules! p2b {
-  ($x:expr) => {
-    $x.write_to_bytes().unwrap().as_slice()
-  }
-}
-
-macro_rules! printhex {
-  ($x:expr) => {
-    for byte in $x {
-      print!("{:02X}", byte);
-    }
-    println!();
-  }
-}
-
 pub struct Dormouse {
   prflock: Mutex<Option<LocnProof>>,
   vidlock: Mutex<Option<Vec<u8>>>,
@@ -152,7 +137,7 @@ impl Dormouse {
         let mut key = vec![0; 32]; //digest::SHA256.output_len
         pbkdf2::derive(&pbkdf2::HMAC_SHA256, 30, prf.get_apnonce(),
                        _key_material, key.as_mut_slice());
-        //printhex!(&key)
+        //printhex!(&key);
         SealingKey::new(&aead::AES_256_GCM, key.as_slice())
       }).unwrap();
 

@@ -2,12 +2,12 @@ extern crate protobuf;
 extern crate openssl;
 
 mod galois_field;
+mod util;
 mod error;
 mod config;
 mod dormouse;
-pub mod vault;
-pub mod messages;
-pub mod crypto;
+mod vault;
+mod messages;
+mod crypto;
 
-pub use config::Config;
 pub use dormouse::Dormouse;
