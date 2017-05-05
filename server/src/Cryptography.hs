@@ -2,6 +2,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Cryptography where
 
+import           Control.Monad
+import           Control.Monad.Loops
 import           Crypto.Hash
 import           Crypto.Number.Serialize
 import           Crypto.PubKey.ECC.ECDSA
@@ -12,13 +14,12 @@ import           Data.ASN1.BitArray
 import           Data.ASN1.Encoding
 import           Data.ASN1.Parse
 import           Data.ASN1.Types
+import           Data.Bifunctor             (first)
 import qualified Data.ByteString            as BS
 import qualified Data.ByteString.Lazy       as LBS
 import           Data.PEM
-import           Control.Monad
-import           Data.Bifunctor (first)
 
-import           ProtoBuf (VaultMsg)
+import           ProtoBuf                   (VaultMsg)
 
 -- OpenSSl notes:
 --
@@ -119,6 +120,28 @@ pubKeyParser = do
   getNext -- End Sequence for SubjectPublicKeyInfo
   return (PublicKey p256 point)
 
+pubKeyParserLax :: ParseASN1 PublicKey
+pubKeyParserLax = do
+  getNext -- Start Sequence for SubjectPublicKeyInfo
+  getNext -- Start Sequence for AlgorithmIdentifier
+  getNext >>= \case
+    OID [1,2,840,10045,2,1] -> return ()
+    _ -> throwParseError "Expecting OID for id-ecPublicKey"
+  _:end:_ <- reverse <$> hasNext `whileM` getNext
+  point <- case end of
+    BitString (BitArray _ b) -> do
+      let uncompressed = BS.head b == 4
+          d = BS.tail b
+          -- MSB encodings
+          x = os2ip $ BS.take 32 d
+          y = os2ip $ BS.drop 32 d
+      if uncompressed then
+        return (Point x y)
+      else
+        throwParseError "Can only parse uncompressed ECPoints"
+    _ -> throwParseError "Error parsing ECPoint"
+  return (PublicKey p256 point)
+
 encodePubKey :: PublicKey -> LBS.ByteString
 encodePubKey pk = encodeASN1 DER asn1
   where
@@ -190,10 +213,14 @@ parsePubKey :: LBS.ByteString -> Either String PublicKey
 parsePubKey = (first ("ASN1 parse error: " ++ ) . runParseASN1 pubKeyParser)
           <=< (first (const "DER parse error.") . decodeASN1 DER)
 
+parsePubKeyLax :: LBS.ByteString -> Either String PublicKey
+parsePubKeyLax = (first ("ASN1 parse error: " ++ ) . runParseASN1 pubKeyParserLax)
+             <=< (first (const "DER parse error.") . decodeASN1 DER)
+
 parsePrivKey :: LBS.ByteString -> Either String PrivateKey
 parsePrivKey = (first ("ASN1 parse error: " ++ ) . runParseASN1 privKeyParser)
            <=< (first (const "DER parse error.") . decodeASN1 DER . LBS.fromStrict . pemContent)
-           <=< ((foldr ((Right .) . const) (Left "No PEMs.") =<<) 
+           <=< ((foldr ((Right .) . const) (Left "No PEMs.") =<<)
             .  (first (const "PEM parse error.") . pemParseLBS))
 
 parseSig :: LBS.ByteString -> Either String Signature
@@ -216,8 +243,8 @@ readPrivKey :: IO ()
 readPrivKey = do
   privKey <- LBS.readFile "prime256v1-key.pem"
   case parsePrivKey privKey of
-    Left  err   -> putStrLn err
-    Right priv  -> putStrLn ("Got: " ++ show priv)
+    Left  err  -> putStrLn err
+    Right priv -> putStrLn ("Got: " ++ show priv)
 
 readSig :: IO ()
 readSig = do

@@ -52,6 +52,7 @@ library
                      , asn1-encoding
                      , pem
                      , memory
+                     , monad-loops
   default-language:    Haskell2010
 
 executable server-exe

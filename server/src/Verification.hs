@@ -22,6 +22,7 @@ import           Data.Binary.Builder.Sized
 import           Data.ByteArray            (convert)
 import qualified Data.ByteString           as SBS
 import qualified Data.ByteString.Lazy      as LBS
+import           Data.Hex
 import           Data.ProtocolBuffers
 import           Data.Serialize.Get
 import           Data.Serialize.Put        (runPut)
@@ -38,9 +39,22 @@ valid m3 vault sig' = do
   let key' = getField $ vault_key m3
       apn = getField $ apnonce (m3 :: LocnProof)
       apKey' = LBS.fromStrict $ getField $ ekey (m3 :: LocnProof)
-      key = (\apk -> maybeCryptoError $ decodeVaultKey <$> decrypt apn apk vPrivKey key') =<< apKey
-      apKey = either (const Nothing) Just $ parsePubKey apKey'
-      locnTag = openVault vault <$> key
+      apKey = either (const Nothing) Just $ parsePubKeyLax apKey'
+      a = maybe undefined id apKey
+  LBS.writeFile "temp.der" apKey'
+  putStrLn (show $ parsePubKeyLax apKey')
+  let sharedSecret = getShared (private_curve vPrivKey) (private_d vPrivKey) (public_q a)
+      bsSharedSecret = convert sharedSecret :: SBS.ByteString
+      pbkSharedSecret = fastPBKDF2_SHA256 Parameters{iterCounts = 30, outputLength = 32} bsSharedSecret apn :: SBS.ByteString
+      key = do
+        ak <- apKey
+        dec <- maybeCryptoError $ decrypt apn ak vPrivKey key'
+        return (decodeVaultKey dec)
+  putStrLn (show sharedSecret)
+  putStrLn (show $ hex bsSharedSecret)
+  putStrLn (show $ hex pbkSharedSecret)
+  putStrLn (show (hex <$> (maybeCryptoError $ decrypt apn a vPrivKey key')))
+  let locnTag = openVault vault <$> key
       hLocnTagM3 = (flip hmac (encode' m3) <$> encodePFs <$> unPoly <$> locnTag) :: Maybe (HMAC SHA256)
       storedSig = either (const Nothing) Just $ parseSig sig'
   if maybe False id $ verify SHA256 <$> apKey <*> storedSig <*> hLocnTagM3
@@ -91,9 +105,12 @@ getPrivKey =  do
 decrypt :: SBS.ByteString -> PublicKey -> PrivateKey -> SBS.ByteString -> CryptoFailable SBS.ByteString
 decrypt apn pubKey privKey cipherText = do
   cipher :: AES256 <- cipherInit pbkSharedSecret
-  aead <- aeadInit AEAD_GCM cipher (nullIV @AES256)
-  let (text, tag) = SBS.splitAt (SBS.length cipherText - 16) cipherText
-  case aeadSimpleDecrypt aead SBS.empty text (AuthTag $ convert tag) of
+  iv <- case makeIV @SBS.ByteString @AES256 "000000000000" of
+    Just i  -> return i
+    Nothing -> CryptoFailed CryptoError_IvSizeInvalid
+  aead <- aeadInit AEAD_GCM cipher iv
+  -- let (text, tag) = SBS.splitAt (SBS.length cipherText - 16) cipherText
+  case aeadSimpleDecrypt aead SBS.empty (SBS.reverse . SBS.drop 16 . SBS.reverse $ cipherText) (AuthTag $ convert $ SBS.reverse . SBS.take 16 . SBS.reverse $ SBS.empty) of
     Just res -> CryptoPassed res
     Nothing  -> CryptoFailed undefined
     where
