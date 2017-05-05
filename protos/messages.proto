@@ -1,6 +1,6 @@
 syntax = "proto2";
 
-option java_package = "rabbits";
+option java_package = "ioana.simple";
 option java_outer_classname = "ProofProtos";
 
 // m1
