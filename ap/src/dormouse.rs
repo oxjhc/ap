@@ -36,7 +36,6 @@ use vault::make_vault;
 use crypto::PubKey;
 use config::Config;
 
-static SERVER_URL: &'static str = "http://oxjhc.club";
 static mut SEQID: i64 = 0;
 
 macro_rules! p2b {
@@ -110,9 +109,9 @@ impl Dormouse {
     });
   }
 
-  pub fn ping_server() {
+  pub fn ping_server(&self) {
     let client = Client::new();
-    let resp = client.get(format!("{}{}", SERVER_URL, "/ping").as_str())
+    let resp = client.get(format!("{}{}", self.cfg.server_url, "/ping").as_str())
       .send().unwrap();
     if resp.status == hyper::Ok {
       println!("server successfully pinged");
@@ -175,7 +174,7 @@ impl Dormouse {
     println!("sending proof to server");
     //printhex!(p2b!(sgn_prf));
     let mut resp =
-      match client.post(format!("{}{}", SERVER_URL, "/proof").as_str())
+      match client.post(format!("{}{}", self.cfg.server_url, "/proof").as_str())
       .header(header::ContentType("application/x-protobuf".parse().unwrap()))
       .body(p2b!(sgn_prf))
       .send() {
@@ -220,7 +219,7 @@ impl Dormouse {
     println!("sending vault to server");
     //printhex!(p2b!(sgn_msg));
     let resp =
-      match client.post(format!("{}{}", SERVER_URL, "/vault").as_str())
+      match client.post(format!("{}{}", self.cfg.server_url, "/vault").as_str())
       .header(header::ContentType("application/x-protobuf".parse().unwrap()))
       .body(p2b!(sgn_msg))
       .send() {

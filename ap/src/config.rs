@@ -11,6 +11,7 @@ use error::Error;
 
 pub struct Config {
   pub key: PrivKey,
+  pub server_url: String,
   pub ping_port: i64,
   pub http_port: i64,
   pub _t_vid_file: String
@@ -36,6 +37,15 @@ impl Config {
               },
               None => panic!("Error reading config: no privkey provided")
             },
+
+            server_url: match keys.get("server_url") {
+              Some(v) => match v.as_str() {
+                Some(v) => Ok(v),
+                None =>
+                  Err(Error::cfg_err("Error reading config: server_url isn't a string!"))
+              },
+              None => Ok("http://oxjhc.club")
+            }?.to_string(),
 
             ping_port: match keys.get("ping_port") {
               Some(v) => match v.as_integer() {

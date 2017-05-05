@@ -25,7 +25,7 @@ fn main() {
       exit(0);
     } else if arg == "-ping" {
       println!("pinging server");
-      Dormouse::ping_server();
+      dormouse.ping_server();
       exit(0);
     }
   }
