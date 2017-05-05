@@ -86,6 +86,7 @@ server pool = checkProof
                           messageVault . entityVal $ blob of
           Left (_, _, err)    -> throwError (err400 {errBody = "Corrupt."})
           Right (_, _, vault) -> do
+            liftIO $ putStrLn "Got corresponding vault, checking validity."
             let signature = getField $ sig (signedProof :: SignedLocnProof)
             proofResult <- liftIO $ valid prf (convertVault vault) (fromStrict signature)
             case proofResult of

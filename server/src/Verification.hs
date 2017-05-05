@@ -1,5 +1,7 @@
 {-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE OverloadedStrings     #-}
+{-# LANGUAGE ScopedTypeVariables   #-}
+{-# LANGUAGE TypeApplications      #-}
 
 module Verification(
     valid,
@@ -11,6 +13,7 @@ import           Crypto.Cipher.AES
 import           Crypto.Cipher.Types
 import           Crypto.Error
 import           Crypto.Hash.Algorithms
+import           Crypto.KDF.PBKDF2
 import           Crypto.MAC.HMAC
 import           Crypto.PubKey.ECC.DH
 import           Crypto.PubKey.ECC.ECDSA
@@ -30,18 +33,19 @@ import           Vault
 
 
 valid :: LocnProof -> Vault PrimeField -> LBS.ByteString -> IO (Maybe (Polynomial PrimeField))
-valid m3 vault sig' = (\vPrivKey ->
-    let key' = getField $ vault_key m3
-        apKey' = LBS.fromStrict $ getField $ ekey (m3 :: LocnProof)
-        key = (\apk -> maybeCryptoError $ decodeVaultKey <$> decrypt apk vPrivKey key') =<< apKey
-        apKey = either (const Nothing) Just $ parsePubKey apKey'
-        locnTag = openVault vault <$> key
-        hLocnTagM3 = (flip hmac (encode' m3) <$> encodePFs <$> unPoly <$> locnTag) :: Maybe (HMAC SHA256)
-        storedSig = either (const Nothing) Just $ parseSig sig'
-    in if maybe False id $ verify SHA256 <$> apKey <*> storedSig <*> hLocnTagM3
-        then locnTag
-        else Nothing
-    ) <$> getPrivKey
+valid m3 vault sig' = do
+  vPrivKey <- getPrivKey
+  let key' = getField $ vault_key m3
+      apn = getField $ apnonce (m3 :: LocnProof)
+      apKey' = LBS.fromStrict $ getField $ ekey (m3 :: LocnProof)
+      key = (\apk -> maybeCryptoError $ decodeVaultKey <$> decrypt apn apk vPrivKey key') =<< apKey
+      apKey = either (const Nothing) Just $ parsePubKey apKey'
+      locnTag = openVault vault <$> key
+      hLocnTagM3 = (flip hmac (encode' m3) <$> encodePFs <$> unPoly <$> locnTag) :: Maybe (HMAC SHA256)
+      storedSig = either (const Nothing) Just $ parseSig sig'
+  if maybe False id $ verify SHA256 <$> apKey <*> storedSig <*> hLocnTagM3
+      then return locnTag
+      else return Nothing
 
 genSignedToken :: Polynomial PrimeField -> IO SignedToken
 genSignedToken locnTag = do
@@ -82,11 +86,20 @@ getPrivKey =  do
     Left  err  -> error "Could not find private key."
     Right priv -> return priv
 
-decrypt :: PublicKey -> PrivateKey -> SBS.ByteString -> CryptoFailable SBS.ByteString
-decrypt pubKey privKey cipherText = flip (flip cbcDecrypt nullIV) cipherText <$> cipher
-    where sharedSecret = getShared (private_curve privKey) (private_d privKey) (public_q pubKey)
-          bsSharedSecret = convert sharedSecret :: SBS.ByteString
-          cipher = cipherInit bsSharedSecret :: CryptoFailable AES128
+
+
+decrypt :: SBS.ByteString -> PublicKey -> PrivateKey -> SBS.ByteString -> CryptoFailable SBS.ByteString
+decrypt apn pubKey privKey cipherText = do
+  cipher :: AES256 <- cipherInit pbkSharedSecret
+  aead <- aeadInit AEAD_GCM cipher (nullIV @AES256)
+  let (text, tag) = SBS.splitAt (SBS.length cipherText - 16) cipherText
+  case aeadSimpleDecrypt aead SBS.empty text (AuthTag $ convert tag) of
+    Just res -> CryptoPassed res
+    Nothing  -> CryptoFailed undefined
+    where
+      sharedSecret = getShared (private_curve privKey) (private_d privKey) (public_q pubKey)
+      bsSharedSecret = convert sharedSecret :: SBS.ByteString
+      pbkSharedSecret = fastPBKDF2_SHA256 Parameters{iterCounts = 30, outputLength = 32} bsSharedSecret apn :: SBS.ByteString
 
 
 checkVaultSignature :: VaultMsg -> LBS.ByteString -> Bool

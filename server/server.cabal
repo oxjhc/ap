@@ -46,7 +46,7 @@ library
                      , persistent-sqlite
                      , monad-logger
                      , string-conversions
-                     , cryptonite
+                     , cryptonite >= 0.22
                      , asn1-parse
                      , asn1-types
                      , asn1-encoding
