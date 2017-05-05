@@ -5,6 +5,8 @@ module Main (main) where
 import           Control.Monad.Logger       (runNoLoggingT)
 import           Data.ByteString.Lazy       (ByteString)
 import           Data.ByteString.Lazy.Char8 (unpack)
+import           Data.Functor.Identity      (Identity (..))
+import           Data.Hex
 import           Data.ProtocolBuffers
 import           Data.Proxy
 import           Data.String
@@ -45,7 +47,7 @@ vaultMsg = VaultMsg
   { vault = putField vault
   , uid = putField "1234"
   , unonce = putField "x"
-  , apid = putField "5678"
+  , apid = putField $ runIdentity $ unhex "3059301306072A8648CE3D020106082A8648CE3D03010703420004B0E53FA5E86FACE6E3CA942B66050819E16965E49C01CCB8ACD90FCCFAA1A9CE5CDD0DA13B73D71AEA17B9BBB53A924CF615E9F90D6F97ED528D0BE966BEA6B7"
   , apnonce = putField "y"
   , time = putField 64
   }
@@ -57,7 +59,7 @@ vaultMsg = VaultMsg
 signedVaultMsg :: SignedVaultMsg
 signedVaultMsg = SignedVaultMsg
   { vault_msg = putField vaultMsg
-  , sig = putField "0"
+  , sig = putField $ runIdentity $ unhex "3045022100863AD2D6495569CBA7A4B074B0BFF7FC0A2A1F1896C8CCCB16F753E66560155A02207C25A6ABFD88241879417FCD3810BE409056A0C75ACE4444AD1B5B6059A55599"
   }
 
 proof :: LocnProof

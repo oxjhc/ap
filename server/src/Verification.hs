@@ -1,5 +1,5 @@
-{-# LANGUAGE OverloadedStrings          #-}
-{-# LANGUAGE DuplicateRecordFields      #-}
+{-# LANGUAGE DuplicateRecordFields #-}
+{-# LANGUAGE OverloadedStrings     #-}
 
 module Verification(
     valid,
@@ -7,26 +7,26 @@ module Verification(
     checkVaultSignature
 ) where
 
-import qualified Data.ByteString.Lazy as LBS
-import qualified Data.ByteString as SBS
-import Data.Serialize.Put (runPut)
-import Data.ProtocolBuffers
-import Data.Binary.Builder.Sized
-import Data.Serialize.Get
-import Data.ByteArray (convert)
-import Crypto.Random
-import Crypto.Error
-import Crypto.Hash.Algorithms
-import Crypto.PubKey.ECC.ECDSA
-import Crypto.PubKey.ECC.DH
-import Crypto.MAC.HMAC
-import Crypto.Cipher.AES
-import Crypto.Cipher.Types
+import           Crypto.Cipher.AES
+import           Crypto.Cipher.Types
+import           Crypto.Error
+import           Crypto.Hash.Algorithms
+import           Crypto.MAC.HMAC
+import           Crypto.PubKey.ECC.DH
+import           Crypto.PubKey.ECC.ECDSA
+import           Crypto.Random
+import           Data.Binary.Builder.Sized
+import           Data.ByteArray            (convert)
+import qualified Data.ByteString           as SBS
+import qualified Data.ByteString.Lazy      as LBS
+import           Data.ProtocolBuffers
+import           Data.Serialize.Get
+import           Data.Serialize.Put        (runPut)
 
-import Number
-import Vault
-import ProtoBuf hiding (Vault)
-import Cryptography
+import           Cryptography
+import           Number
+import           ProtoBuf                  hiding (Vault)
+import           Vault
 
 
 valid :: LocnProof -> Vault PrimeField -> LBS.ByteString -> IO (Maybe (Polynomial PrimeField))
@@ -38,7 +38,7 @@ valid m3 vault sig' = (\vPrivKey ->
         locnTag = openVault vault <$> key
         hLocnTagM3 = (flip hmac (encode' m3) <$> encodePFs <$> unPoly <$> locnTag) :: Maybe (HMAC SHA256)
         storedSig = either (const Nothing) Just $ parseSig sig'
-    in if maybe False id $ verify SHA256 <$> apKey <*> storedSig <*> hLocnTagM3 
+    in if maybe False id $ verify SHA256 <$> apKey <*> storedSig <*> hLocnTagM3
         then locnTag
         else Nothing
     ) <$> getPrivKey
@@ -76,7 +76,11 @@ encode' :: Encode a => a -> SBS.ByteString
 encode' = LBS.toStrict . toLazyByteString . encodeMessage
 
 getPrivKey :: IO PrivateKey
-getPrivKey = error "Unimplemented"
+getPrivKey =  do
+  privKey <- LBS.readFile "prime256v1-key.pem"
+  case parsePrivKey privKey of
+    Left  err  -> error "Could not find private key."
+    Right priv -> return priv
 
 decrypt :: PublicKey -> PrivateKey -> SBS.ByteString -> CryptoFailable SBS.ByteString
 decrypt pubKey privKey cipherText = flip (flip cbcDecrypt nullIV) cipherText <$> cipher

@@ -24,9 +24,9 @@ import           Network.Wai.Handler.Warp
 import           Network.Wai.Logger
 import           Servant                   hiding (Vault)
 
-import           ProtoBuf
-import           Models
 import           Cryptography
+import           Models
+import           ProtoBuf
 import           Verification
 
 newtype VaultResp = VaultResp String deriving (Eq, Show, MimeRender PlainText)
