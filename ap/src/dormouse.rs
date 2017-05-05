@@ -47,7 +47,7 @@ macro_rules! p2b {
 macro_rules! printhex {
   ($x:expr) => {
     for byte in $x {
-      print!("{:X}", byte);
+      print!("{:02X}", byte);
     }
     println!();
   }
@@ -67,6 +67,7 @@ impl Dormouse {
 
     Dormouse::spawn_pinger(cfg.ping_port);
 
+    //printhex!(cfg.key.pub_to_der().unwrap());
     Dormouse{prflock, vidlock, cfg}
   }
 
