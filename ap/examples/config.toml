@@ -1,0 +1,6 @@
+[config]
+privkey = "/etc/dormouse/privkey.pem"
+http_port = 80
+_t_verif_pubkey = "/etc/dormouse/vpubkey.pem"
+server_url = "http://localhost"
+
