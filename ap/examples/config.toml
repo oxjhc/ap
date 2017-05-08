@@ -5,4 +5,5 @@
 privkey = "/etc/dormouse/privkey.pem"
 http_port = 80
 _t_verif_pubkey = "/etc/dormouse/vpubkey.pem"
-server_url = "http://localhost"
+server_url = "http://oxjhc.club"
+locn_tag = [15127,59565,53831,2057,25201,57895,23177,56698,47450,40413]

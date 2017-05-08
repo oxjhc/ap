@@ -49,6 +49,10 @@ impl GF {
     GF(val as u32 % FIELD_SZ)
   }
 
+  pub fn to_byte_pair(self) -> (u8, u8) {
+    ((self.0 >> 8) as u8, self.0 as u8)
+  }
+
   pub fn pow(self, exp: u32) -> GF {
     let mut e = exp;
     let mut base = self;
@@ -120,6 +124,16 @@ impl Rem<u32> for GF {
   fn rem(self, other: u32) -> GF {
     let GF(n) = self;
     GF(n%other)
+  }
+}
+
+impl From<i64> for GF {
+  fn from(val: i64) -> GF {
+    if val < 0 {
+      GF((val % FIELD_SZ as i64) as u32 + FIELD_SZ)
+    } else {
+      GF(val as u32 % FIELD_SZ)
+    }
   }
 }
 

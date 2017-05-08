@@ -1,12 +1,9 @@
 extern crate hyper;
-extern crate untrusted;
 extern crate ring;
-extern crate get_if_addrs;
+extern crate base64;
 
-use std::{thread, time};
-use std::net::UdpSocket;
+use std::time;
 use std::sync::Mutex;
-use std::mem::transmute;
 use std::io::Read;
 
 use self::hyper::server::{Handler, Request, Response};
@@ -15,18 +12,13 @@ use self::hyper::status::StatusCode;
 use self::hyper::uri::RequestUri;
 use self::hyper::header;
 
-use self::untrusted::Input;
-
-use self::ring::{agreement, rand, pbkdf2, aead};
+use self::ring::{rand, aead};
 use self::ring::rand::SecureRandom;
-use self::ring::aead::SealingKey;
 
 use openssl::hash::MessageDigest as MD;
 
 use protobuf;
 use protobuf::Message;
-
-use self::get_if_addrs::{get_if_addrs as ifaces, IfAddr};
 
 use messages::{SignedProofReq,
                ProofResp, SignedProofResp,
@@ -34,16 +26,15 @@ use messages::{SignedProofReq,
                LocnProof, SignedLocnProof,
                SignedToken};
 use vault::make_vault;
-use crypto::PubKey;
+use crypto::{PubKey, EphKey};
 use config::Config;
 use error::Error;
-
-static mut SEQID: i64 = 0;
+use pinger::Pinger;
 
 pub struct Dormouse {
   prflock: Mutex<Option<LocnProof>>,
-  vidlock: Mutex<Option<Vec<u8>>>,
-  taglock: Mutex<Vec<u8>>,
+  vidlock: Mutex<Option<PubKey>>,
+  pinger: Pinger,
   pub cfg: Config
 }
 
@@ -51,52 +42,12 @@ impl Dormouse {
   pub fn new() -> Dormouse {
     let prflock = Mutex::new(None);
     let vidlock = Mutex::new(None);
-    let taglock = Mutex::new(vec![0; 10]);;
     let cfg = Config::new().unwrap();
 
-    Dormouse::spawn_pinger(cfg.ping_port);
+    let pinger = Pinger::new(cfg.ping_port).unwrap();
 
     //printhex!(cfg.key.pub_to_der().unwrap());
-    Dormouse{prflock, vidlock, taglock, cfg}
-  }
-
-  fn ping(sock: &UdpSocket, addr: String) {
-    // convert SEQID to a byte array
-    let data : [u8; 8] = unsafe { transmute(SEQID.to_be()) };
-    match sock.send_to(&data, &addr) {
-      Ok(n) => if n == 8 {
-        println!("pinged {} with seqid {}", addr,
-                 unsafe { transmute::<[u8; 8], i64>(data) }); },
-      Err(err) => println!("failed to send ping: {}", err)
-    }
-  }
-
-  fn spawn_pinger(port: i64) {
-    // this... should be modifiable at runtime.
-    // buuuuuuuut I'm lazy
-    let pinger = UdpSocket::bind(format!("0.0.0.0:{}", port)).unwrap();
-    pinger.set_broadcast(true).unwrap();
-
-    thread::spawn(move || {
-      let rand = rand::SystemRandom::new();
-      loop {
-        thread::sleep(time::Duration::from_millis(300));
-        for iface in ifaces().unwrap() {
-          if iface.name.starts_with("p2p") {
-            match iface.addr {
-              IfAddr::V4(addr) => match addr.broadcast {
-                Some(brip) => {
-                  unsafe { rand.fill(transmute::<&mut i64, &mut [u8;8]>(&mut SEQID)).unwrap(); };
-                  Dormouse::ping(&pinger, format!("{}:{}", brip, port));
-                },
-                _ => unsafe { SEQID = 0; }
-              },
-              _ => unsafe { SEQID = 0; }
-            }
-          }
-        }
-      }
-    });
+    Dormouse{prflock, vidlock, pinger, cfg}
   }
 
   pub fn ping_server(&self) {
@@ -127,23 +78,12 @@ impl Dormouse {
     let mut vault_key = self.gen_proof(uid.as_slice(), unonce.as_slice(),
                                        nonce.as_slice(), time).unwrap();
 
-    let rand = rand::SystemRandom::new();
-    let ekey = agreement::EphemeralPrivateKey::generate(&agreement::ECDH_P256, &rand).unwrap();
-    let mut pubept = vec![0u8; ekey.public_key_len()];
-    ekey.compute_public_key(&mut pubept).unwrap();
-    let pubekey = PubKey::from_point(pubept.as_slice()).unwrap();
-    let vid = PubKey::from_file(&self.cfg._t_vid_file).unwrap().to_point_bytes().unwrap();
-    let vid = Input::from(vid.as_slice());
+    let ekey = EphKey::new().unwrap();
+    let vid = PubKey::from_file(&self.cfg._t_vid_file).unwrap();
+    prf.set_ekey(ekey.pub_to_der().unwrap());
+    prf.set_time(time);
 
-    let key = agreement::agree_ephemeral(
-      ekey, &agreement::ECDH_P256, vid, ring::error::Unspecified,
-      |_key_material| {
-        let mut key = vec![0; 32]; //digest::SHA256.output_len
-        pbkdf2::derive(&pbkdf2::HMAC_SHA256, 30, prf.get_apnonce(),
-                       _key_material, key.as_mut_slice());
-        //printhex!(&key);
-        SealingKey::new(&aead::AES_256_GCM, key.as_slice())
-      }).unwrap();
+    let key = ekey.agree_ephemeral(&vid, prf.get_apnonce()).unwrap();
 
     vault_key.extend(vec![0; 16]);
     vault_key = match aead::seal_in_place(&key, &[0; 12], &[], vault_key.as_mut_slice(), 16) {
@@ -152,14 +92,12 @@ impl Dormouse {
     };
 
     prf.set_vault_key(vault_key);
-    prf.set_ekey(pubekey.pub_to_der().unwrap());
-    prf.set_time(time);
 
-    let locn_tag = self.taglock.lock().unwrap();
-    println!("locn_tag: {:?}", *locn_tag);
+    println!("locn_tag: {:?}", self.cfg.locn_tag);
     let mut to_sign = Vec::with_capacity(20);
-    for x in locn_tag.iter() {
-      to_sign.push(0); to_sign.push(*x);
+    for x in self.cfg.locn_tag.iter() {
+      let (h, l) = x.to_byte_pair();
+      to_sign.push(h); to_sign.push(l);
     }
     let sig = self.cfg.key.sign(MD::sha256(), to_sign.as_slice()).unwrap();
     let mut sgn_prf = SignedLocnProof::new();
@@ -185,10 +123,10 @@ impl Dormouse {
       let sgn_tok : SignedToken = protobuf::parse_from_reader(&mut resp).unwrap();
       print!("token:\n\t");
       printhex!(sgn_tok.get_token().get_vnonce());
-      print!("locn_tag hex:\n\t");
-      printhex!(to_sign);
-      print!("received locn_tag hex:\n\t");
-      printhex!(sgn_tok.get_token().get_locn_tag());
+      print!("locn_tag base64:\n\t");
+      print64!(to_sign);
+      print!("received locn_tag base64:\n\t");
+      print64!(sgn_tok.get_token().get_locn_tag());
       // done.
     } else {
       println!("error sending vault: {}", resp.status);
@@ -200,11 +138,9 @@ impl Dormouse {
 
   fn gen_proof(&self, uid: &[u8], unonce: &[u8], nonce: &[u8], time: u64) -> Result<Vec<u8>, Error> {
     println!("starting gen_proof");
-    let mut locn_tag = self.taglock.lock().unwrap();
-    let rand = rand::SystemRandom::new();
-    rand.fill(locn_tag.as_mut_slice())?;
+    // probably add ways to get tag from cssi
     let key_sz = 10;
-    let (vault, vault_key) = make_vault(locn_tag.as_slice(), key_sz, 100);
+    let (vault, vault_key) = make_vault(self.cfg.locn_tag.as_slice(), key_sz, 100);
 
     let mut msg = VaultMsg::new();
     msg.set_vault(vault);
@@ -300,12 +236,12 @@ impl Handler for Dormouse {
           };
           let mut prf_req = sgn_prf_req.take_proofreq();
 
-          if prf_req.get_seqid() != unsafe { SEQID } && unsafe { SEQID } != 0 {
+          if prf_req.get_seqid() != self.pinger.get_seqid() {
             reply!(StatusCode::Unauthorized, b"The sequence id sent is too old");
             return;
           }
 
-          *vid = Some(etry!(etry!(PubKey::from_der(prf_req.get_vid())).to_point_bytes()));
+          *vid = Some(etry!(PubKey::from_der(prf_req.get_vid())));
 
           let uid = match PubKey::from_der(prf_req.get_uid()) {
             Ok(v) => v,
@@ -366,11 +302,7 @@ impl Handler for Dormouse {
             let time = etry!(time::SystemTime::now().duration_since(time::UNIX_EPOCH)).as_secs();
             let mut vault_key = etry!(self.gen_proof(prf.get_uid(), prf.get_unonce(), prf.get_apnonce(), time));
 
-            let rand = rand::SystemRandom::new();
-            let ekey = etry!(agreement::EphemeralPrivateKey::generate(&agreement::ECDH_P256, &rand));
-            let mut pubept = vec![0u8; ekey.public_key_len()];
-            etry!(ekey.compute_public_key(&mut pubept));
-            let pubekey = etry!(PubKey::from_point(pubept.as_slice()));
+            let ekey = etry!(EphKey::new());
             let ref vid = match *vidg {
               Some(ref v) => v,
               None => {
@@ -379,16 +311,10 @@ impl Handler for Dormouse {
                 return;
               }
             };
-            let vid = Input::from(vid.as_slice());
+            prf.set_ekey(etry!(ekey.pub_to_der()));
+            prf.set_time(time);
 
-            let key = etry!(agreement::agree_ephemeral(
-              ekey, &agreement::ECDH_P256, vid, ring::error::Unspecified,
-              |_key_material| {
-                let mut key = vec![0; 32]; //digest::SHA256.output_len
-                pbkdf2::derive(&pbkdf2::HMAC_SHA256, 30, prf.get_apnonce(),
-                               _key_material, key.as_mut_slice());
-                SealingKey::new(&aead::AES_256_GCM, key.as_slice())
-              }));
+            let key = etry!(ekey.agree_ephemeral(vid, prf.get_apnonce()));
 
             vault_key.extend(vec![0; 16]);
             vault_key = match aead::seal_in_place(&key, &[0; 12], &[], vault_key.as_mut_slice(), 16) {
@@ -400,8 +326,6 @@ impl Handler for Dormouse {
               }
             };
             prf.set_vault_key(vault_key);
-            prf.set_ekey(etry!(pubekey.pub_to_der()));
-            prf.set_time(time);
 
             let sig = self.cfg.key.sign(MD::sha256(), p2b!(prf)).unwrap();
             let mut sgn_prf = SignedLocnProof::new();

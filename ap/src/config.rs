@@ -6,6 +6,7 @@ use std::io::Read;
 
 use self::toml::Value;
 
+use galois_field::GF;
 use crypto::PrivKey;
 use error::Error;
 
@@ -14,6 +15,7 @@ pub struct Config {
   pub server_url: String,
   pub ping_port: i64,
   pub http_port: i64,
+  pub locn_tag: Vec<GF>,
   pub _t_vid_file: String
 }
 
@@ -63,6 +65,25 @@ impl Config {
                   Err(Error::cfg_err("Error reading config: http_port isn't an integer!"))
               },
               None => Ok(80)
+            }?,
+
+            locn_tag: match keys.get("locn_tag") {
+              Some(v) => match v.as_array() {
+                Some(arr) => {
+                  let mut tag = Vec::with_capacity(10);
+                  for v in arr {
+                    match v.as_integer() {
+                      Some(i) => tag.push(From::from(i)),
+                      None =>
+                        return Err(Error::cfg_err("Error reading config: locn_tag contains a non-integer"))
+                    }
+                  }
+                  Ok(tag)
+                },
+                None =>
+                  Err(Error::cfg_err("Error reading config: locn_tag isn't an array!"))
+              },
+              None => Err(Error::cfg_err("Error reading config: no locn_tag!"))
             }?,
 
             _t_vid_file: match keys.get("_t_verif_pubkey") {

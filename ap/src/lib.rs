@@ -5,6 +5,7 @@ mod galois_field;
 mod util;
 mod error;
 mod config;
+mod pinger;
 mod dormouse;
 mod vault;
 mod messages;

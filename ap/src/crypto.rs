@@ -1,8 +1,16 @@
+extern crate untrusted;
+extern crate ring;
 extern crate openssl;
 extern crate base64;
 
 use std::fs::File;
 use std::io::Read;
+
+use self::untrusted::Input;
+
+use self::ring::{agreement, rand, pbkdf2, aead};
+use self::ring::agreement::EphemeralPrivateKey;
+use self::ring::aead::SealingKey;
 
 use self::openssl::bn::BigNumContext;
 use self::openssl::pkey::PKey;
@@ -35,6 +43,40 @@ impl PrivKey {
     let mut signer = Signer::new(digest, &self.pkey).unwrap();
     signer.update(msg)?;
     Ok(signer.finish()?)
+  }
+}
+
+pub struct EphKey {
+  key: EphemeralPrivateKey,
+  pubkey: PubKey
+}
+
+impl EphKey {
+  pub fn new() -> Result<EphKey, Error> {
+    let rand = rand::SystemRandom::new();
+    let key = agreement::EphemeralPrivateKey::generate(&agreement::ECDH_P256, &rand)?;
+    let mut pubept = vec![0u8; key.public_key_len()];
+    key.compute_public_key(&mut pubept)?;
+    let pubkey = PubKey::from_point(pubept.as_slice())?;
+    Ok(EphKey{key, pubkey})
+  }
+
+  pub fn pub_to_der(&self) -> Result<Vec<u8>, Error> {
+    self.pubkey.pub_to_der()
+  }
+
+  pub fn agree_ephemeral(self, vid: &PubKey, nonce: &[u8]) -> Result<SealingKey, Error> {
+    let bytes = vid.point_bytes()?;
+    let vidin = Input::from(bytes.as_slice());
+    Ok(agreement::agree_ephemeral(
+      self.key, &agreement::ECDH_P256, vidin, ring::error::Unspecified,
+      |_key_material| {
+        let mut key = vec![0; 32]; //digest::SHA256.output_len
+        pbkdf2::derive(&pbkdf2::HMAC_SHA256, 30, nonce,
+                       _key_material, key.as_mut_slice());
+        //printhex!(&key);
+        SealingKey::new(&aead::AES_256_GCM, key.as_slice())
+      })?)
   }
 }
 
@@ -83,7 +125,7 @@ impl PubKey {
     Ok(verifier.finish(sig)?)
   }
 
-  pub fn to_point_bytes(&self) -> Result<Vec<u8>, Error> {
+  pub fn point_bytes(&self) -> Result<Vec<u8>, Error> {
     let group = EcGroup::from_curve_name(CURVE)?;
     let mut ctx = BigNumContext::new()?;
     let eckey = self.pkey.ec_key()?;

@@ -13,14 +13,14 @@ use messages::{VaultMsg_Vault as Vault, VaultMsg_Vault_Point as Point};
 
 use protobuf;
 
-fn make_poly(locn_tag: &[u8]) -> Box<Fn(GF) -> GF> {
-  let mut gf_locn_tag = Vec::with_capacity(locn_tag.len());
-  for loc in locn_tag {
-    gf_locn_tag.push(GF::new8(loc.clone()));
+fn make_poly(locn_tag: &[GF]) -> Box<Fn(GF) -> GF> {
+  let mut my_tag = Vec::with_capacity(locn_tag.len());
+  for x in locn_tag {
+    my_tag.push(*x);
   }
   Box::new(move |x: GF| {
     let mut ret = GF::new(0);
-    for (i, loc) in gf_locn_tag.iter().enumerate() {
+    for (i, loc) in my_tag.iter().enumerate() {
       ret += x.pow(i as u32) * *loc;
     }
     ret
@@ -34,7 +34,7 @@ fn make_point(x: GF, y: GF) -> Point {
   return pt;
 }
 
-pub fn make_vault(locn_tag: &[u8], data_sz: usize, vault_sz: usize) -> (Vault, Vec<u16>) {
+pub fn make_vault(locn_tag: &[GF], data_sz: usize, vault_sz: usize) -> (Vault, Vec<u16>) {
   let mut vault = Vault::new();
   let mut points = protobuf::RepeatedField::new();
 

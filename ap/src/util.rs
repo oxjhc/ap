@@ -14,3 +14,9 @@ macro_rules! printhex {
     println!();
   }
 }
+
+macro_rules! print64 {
+  ($x:expr) => {
+    println!("{}", base64::encode(&$x));
+  }
+}
