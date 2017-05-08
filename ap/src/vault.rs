@@ -50,7 +50,8 @@ pub fn make_vault(locn_tag: Vec<u8>, data_sz: usize, vault_sz: usize) -> (Vault,
     while xs.contains(&x) { x = GF::new(rand.gen_range(0, FIELD_SZ)); }
     let y = poly(x);
     let xi: u16 = x.into();
-    key.push(xi.to_be());
+    println!("{}", xi);
+    key.push(xi);
     xs.insert(x);
     ys.insert(y);
 
@@ -70,5 +71,6 @@ pub fn make_vault(locn_tag: Vec<u8>, data_sz: usize, vault_sz: usize) -> (Vault,
   }
 
   vault.set_points(points);
+
   (vault, key)
 }

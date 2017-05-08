@@ -223,7 +223,12 @@ impl Dormouse {
       println!("error sending vault: {}", resp.status);
     }
 
-    Ok(unsafe {transmute(vault_key)})
+    let mut ret = Vec::<u8>::with_capacity(20);
+    vault_key.into_iter().map(|x| {
+      ret.push((x >> 8) as u8); ret.push(x as u8);
+    }).last(); // last() is run to consume the iterator because it's lazy and won't
+               // evaluate the funtion otherwise.
+    Ok(ret)
   }
 }
 
@@ -251,6 +256,7 @@ impl Handler for Dormouse {
         }
       }
     }
+
     match req.uri.clone() {
       RequestUri::AbsolutePath(ref path) => match (&req.method, &path[..]) {
         (&hyper::Post, "/proof_req") => {
@@ -305,13 +311,12 @@ impl Handler for Dormouse {
             reply!(StatusCode::Ok, p2b!(sgn_prf_res));
 
             // generate nonce
-            let mut nonce = vec![0; 10];
+            let mut nonce = vec![0x42; 10];
             let rand = rand::SystemRandom::new();
             match rand.fill(nonce.as_mut_slice()) {
               Ok(_) => (),
               Err(e) => {
                 println!("Failed to create nonce: {}", e);
-                nonce = vec![0x42; 10]
               }
             }
 
