@@ -1,6 +1,8 @@
 [config]
+# Please PLEASE don't use this private key in production.
+# Not that anybody will ever be putting this code into production.
+# But just in case, please don't.
 privkey = "/etc/dormouse/privkey.pem"
 http_port = 80
 _t_verif_pubkey = "/etc/dormouse/vpubkey.pem"
 server_url = "http://localhost"
-
