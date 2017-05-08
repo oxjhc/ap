@@ -1,6 +1,7 @@
 use std::ops::*;
 use std::convert::Into;
 use std::convert::From;
+use std::fmt;
 
 pub const FIELD_SZ: u32 = 65521;
 
@@ -38,7 +39,7 @@ impl Add for GF {
 // TODO: CRYPTOGRAPHICALLY HARDEN
 // IMPORTANT!
 
-#[derive(Eq, PartialEq, Ord, PartialOrd, Clone, Copy, Hash, Debug, Default)]
+#[derive(Eq, PartialEq, Ord, PartialOrd, Clone, Copy, Hash, Default)]
 pub struct GF(u32);
 
 impl GF {
@@ -66,6 +67,18 @@ impl GF {
       res = res*base % FIELD_SZ;
     }
     res
+  }
+}
+
+impl fmt::Debug for GF {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    write!(f, "GF({})", self.0 as i64 - FIELD_SZ as i64/2)
+  }
+}
+
+impl fmt::Display for GF {
+  fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+    (self.0 as i64 - FIELD_SZ as i64/2).fmt(f)
   }
 }
 

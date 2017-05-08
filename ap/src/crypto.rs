@@ -11,6 +11,7 @@ use self::untrusted::Input;
 use self::ring::{agreement, rand, pbkdf2, aead};
 use self::ring::agreement::EphemeralPrivateKey;
 use self::ring::aead::SealingKey;
+use self::ring::rand::SecureRandom;
 
 use self::openssl::bn::BigNumContext;
 use self::openssl::pkey::PKey;
@@ -20,6 +21,18 @@ use self::openssl::ec::{POINT_CONVERSION_UNCOMPRESSED, EcPoint, EcGroup, EcKey};
 use self::openssl::hash::MessageDigest;
 
 use error::Error;
+
+pub fn gen_nonce() -> Vec<u8> {
+  let mut nonce = vec![0x42; 10];
+  let rand = rand::SystemRandom::new();
+  match rand.fill(nonce.as_mut_slice()) {
+    Ok(_) => (),
+    Err(e) => {
+      println!("Failed to create nonce: {}", e);
+    }
+  }
+  nonce
+}
 
 pub struct PrivKey {
   pkey: PKey
@@ -39,8 +52,8 @@ impl PrivKey {
     Ok(self.pkey.public_key_to_der()?)
   }
 
-  pub fn sign(&self, digest: MessageDigest, msg: &[u8]) -> Result<Vec<u8>, Error> {
-    let mut signer = Signer::new(digest, &self.pkey).unwrap();
+  pub fn sign(&self, msg: &[u8]) -> Result<Vec<u8>, Error> {
+    let mut signer = Signer::new(MessageDigest::sha256(), &self.pkey).unwrap();
     signer.update(msg)?;
     Ok(signer.finish()?)
   }
@@ -65,7 +78,7 @@ impl EphKey {
     self.pubkey.pub_to_der()
   }
 
-  pub fn agree_ephemeral(self, vid: &PubKey, nonce: &[u8]) -> Result<SealingKey, Error> {
+  fn ecdh(self, vid: &PubKey, nonce: &[u8]) -> Result<SealingKey, Error> {
     let bytes = vid.point_bytes()?;
     let vidin = Input::from(bytes.as_slice());
     Ok(agreement::agree_ephemeral(
@@ -77,6 +90,18 @@ impl EphKey {
         //printhex!(&key);
         SealingKey::new(&aead::AES_256_GCM, key.as_slice())
       })?)
+  }
+
+  pub fn seal(self, data: &[u8], vid: &PubKey, nonce: &[u8]) -> Result<Vec<u8>, Error> {
+    let mut data = data.to_vec();
+    data.extend(vec![0; 16]);
+
+    let key = self.ecdh(vid, nonce)?;
+
+    match aead::seal_in_place(&key, &[0; 12], &[], data.as_mut_slice(), 16) {
+      Ok(len) => Ok(data[..len].to_vec()),
+      Err(e) => Err(From::from(e))
+    }
   }
 }
 
@@ -119,8 +144,8 @@ impl PubKey {
     Ok(self.pkey.public_key_to_der()?)
   }
 
-  pub fn verify(&self, digest: MessageDigest, msg: &[u8], sig: &[u8]) -> Result<bool, Error> {
-    let mut verifier = Verifier::new(digest, &self.pkey)?;
+  pub fn verify(&self, msg: &[u8], sig: &[u8]) -> Result<bool, Error> {
+    let mut verifier = Verifier::new(MessageDigest::sha256(), &self.pkey)?;
     verifier.update(msg)?;
     Ok(verifier.finish(sig)?)
   }

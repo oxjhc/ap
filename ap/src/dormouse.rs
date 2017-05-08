@@ -12,11 +12,6 @@ use self::hyper::status::StatusCode;
 use self::hyper::uri::RequestUri;
 use self::hyper::header;
 
-use self::ring::{rand, aead};
-use self::ring::rand::SecureRandom;
-
-use openssl::hash::MessageDigest as MD;
-
 use protobuf;
 use protobuf::Message;
 
@@ -26,7 +21,7 @@ use messages::{SignedProofReq,
                LocnProof, SignedLocnProof,
                SignedToken};
 use vault::make_vault;
-use crypto::{PubKey, EphKey};
+use crypto::{PubKey, EphKey, gen_nonce};
 use config::Config;
 use error::Error;
 use pinger::Pinger;
@@ -64,8 +59,8 @@ impl Dormouse {
 
   pub fn server_test(&self) {
     let uid = vec![0x00];
-    let unonce = vec![0x11];
-    let nonce = vec![0x22];
+    let unonce = gen_nonce();
+    let nonce = gen_nonce();
     let time = time::SystemTime::now().duration_since(time::UNIX_EPOCH).unwrap().as_secs();
 
     let mut prf = LocnProof::new();
@@ -83,13 +78,7 @@ impl Dormouse {
     prf.set_ekey(ekey.pub_to_der().unwrap());
     prf.set_time(time);
 
-    let key = ekey.agree_ephemeral(&vid, prf.get_apnonce()).unwrap();
-
-    vault_key.extend(vec![0; 16]);
-    vault_key = match aead::seal_in_place(&key, &[0; 12], &[], vault_key.as_mut_slice(), 16) {
-      Ok(len) => vault_key[..len].to_vec(),
-      Err(e) => panic!("Error sealing vault key: {}", e)
-    };
+    vault_key = ekey.seal(vault_key.as_slice(), &vid, prf.get_apnonce()).unwrap();
 
     prf.set_vault_key(vault_key);
 
@@ -99,7 +88,7 @@ impl Dormouse {
       let (h, l) = x.to_byte_pair();
       to_sign.push(h); to_sign.push(l);
     }
-    let sig = self.cfg.key.sign(MD::sha256(), to_sign.as_slice()).unwrap();
+    let sig = self.cfg.key.sign(to_sign.as_slice()).unwrap();
     let mut sgn_prf = SignedLocnProof::new();
     sgn_prf.set_locnproof(prf.clone());
 		sgn_prf.set_sig(sig);
@@ -150,7 +139,7 @@ impl Dormouse {
     msg.set_apnonce(nonce.to_vec());
     msg.set_time(time);
 
-    let sig = self.cfg.key.sign(MD::sha256(), p2b!(msg)).unwrap();
+    let sig = self.cfg.key.sign(p2b!(msg)).unwrap();
     let mut sgn_msg = SignedVaultMsg::new();
     sgn_msg.set_vault_msg(msg);
     sgn_msg.set_sig(sig);
@@ -252,12 +241,12 @@ impl Handler for Dormouse {
             }
           };
 
-          if etry!(uid.verify(MD::sha256(), p2b!(prf_req), sgn_prf_req.take_sig().as_slice())) {
+          if etry!(uid.verify(p2b!(prf_req), sgn_prf_req.take_sig().as_slice())) {
             let mut prf_res = ProofResp::new();
             prf_res.set_uid(prf_req.get_uid().to_vec());
             prf_res.set_unonce(prf_req.get_unonce().to_vec());
 
-            let sig = self.cfg.key.sign(MD::sha256(), p2b!(prf_res)).unwrap();
+            let sig = self.cfg.key.sign(p2b!(prf_res)).unwrap();
             let mut sgn_prf_res = SignedProofResp::new();
             sgn_prf_res.set_proofresp(prf_res.clone());
             sgn_prf_res.set_sig(sig);
@@ -265,14 +254,7 @@ impl Handler for Dormouse {
             reply!(StatusCode::Ok, p2b!(sgn_prf_res));
 
             // generate nonce
-            let mut nonce = vec![0x42; 10];
-            let rand = rand::SystemRandom::new();
-            match rand.fill(nonce.as_mut_slice()) {
-              Ok(_) => (),
-              Err(e) => {
-                println!("Failed to create nonce: {}", e);
-              }
-            }
+            let nonce = gen_nonce();
 
             prf.set_uid(prf_req.take_uid());
             prf.set_unonce(prf_req.take_unonce());
@@ -314,20 +296,16 @@ impl Handler for Dormouse {
             prf.set_ekey(etry!(ekey.pub_to_der()));
             prf.set_time(time);
 
-            let key = etry!(ekey.agree_ephemeral(vid, prf.get_apnonce()));
+            vault_key = etry!(ekey.seal(vault_key.as_slice(), &vid, prf.get_apnonce()));
 
-            vault_key.extend(vec![0; 16]);
-            vault_key = match aead::seal_in_place(&key, &[0; 12], &[], vault_key.as_mut_slice(), 16) {
-              Ok(len) => vault_key[..len].to_vec(),
-              Err(e) => {
-                println!("Error sealing vault key: {}", e);
-                reply!(StatusCode::InternalServerError, b"Something broke :'(");
-                return;
-              }
-            };
             prf.set_vault_key(vault_key);
 
-            let sig = self.cfg.key.sign(MD::sha256(), p2b!(prf)).unwrap();
+            let mut to_sign = Vec::with_capacity(20);
+            for x in self.cfg.locn_tag.iter() {
+              let (h, l) = x.to_byte_pair();
+              to_sign.push(h); to_sign.push(l);
+            }
+            let sig = self.cfg.key.sign(to_sign.as_slice()).unwrap();
             let mut sgn_prf = SignedLocnProof::new();
             sgn_prf.set_locnproof(prf.clone());
 					  sgn_prf.set_sig(sig);
