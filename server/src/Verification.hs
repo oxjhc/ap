@@ -38,17 +38,18 @@ valid m3 vault sig' = do
   vPrivKey <- getPrivKey
   let key' = getField $ vault_key m3
       apn = getField $ apnonce (m3 :: LocnProof)
-      apKey' = LBS.fromStrict $ getField $ ekey (m3 :: LocnProof)
+      eKey' = LBS.fromStrict $ getField $ ekey (m3 :: LocnProof)
+      eKey = either (const Nothing) Just $ parsePubKeyLax eKey'
+      apKey' = LBS.fromStrict $ getField $ apid (m3 :: LocnProof)
       apKey = either (const Nothing) Just $ parsePubKeyLax apKey'
       a = maybe undefined id apKey
-  LBS.writeFile "temp.der" apKey'
-  putStrLn (show $ parsePubKeyLax apKey')
+  putStrLn (show $ parsePubKeyLax eKey')
   let key = do
-        ak <- apKey
+        ak <- eKey
         dec <- maybeCryptoError $ decrypt apn ak vPrivKey key'
         return (decodeVaultKey dec)
       locnTag = openVault vault <$> key
-      hLocnTagM3 = (flip hmac (encode' m3) <$> encodePFs <$> unPoly <$> locnTag) :: Maybe (HMAC SHA256)
+      hLocnTagM3 = encodePFs <$> unPoly <$> locnTag
       storedSig = either (const Nothing) Just $ parseSig sig'
   putStrLn (show key)
   putStrLn (show $ unPoly <$> locnTag)
