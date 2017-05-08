@@ -43,7 +43,6 @@ valid m3 vault sig' = do
       apKey' = LBS.fromStrict $ getField $ apid (m3 :: LocnProof)
       apKey = either (const Nothing) Just $ parsePubKeyLax apKey'
       a = maybe undefined id apKey
-  putStrLn (show $ parsePubKeyLax eKey')
   let key = do
         ak <- eKey
         dec <- maybeCryptoError $ decrypt apn ak vPrivKey key'
@@ -51,8 +50,6 @@ valid m3 vault sig' = do
       locnTag = openVault vault <$> key
       hLocnTagM3 = encodePFs <$> unPoly <$> locnTag
       storedSig = either (const Nothing) Just $ parseSig sig'
-  putStrLn (show key)
-  putStrLn (show $ unPoly <$> locnTag)
   if maybe False id $ verify SHA256 <$> apKey <*> storedSig <*> hLocnTagM3
       then return locnTag
       else return Nothing

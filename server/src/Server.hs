@@ -8,6 +8,7 @@
 
 module Server where
 
+import           Control.Monad             (guard)
 import           Control.Monad.IO.Class
 import           Control.Monad.Logger      (runStderrLoggingT)
 import           Data.Binary.Builder.Sized
@@ -71,14 +72,17 @@ server pool = checkProof
     checkProof :: SignedLocnProof -> Handler SignedToken
     checkProof signedProof = do
       let prf  = getField $ locnproof signedProof
-      -- liftIO (putStrLn "Checking proof." >> (print $ showProto signedProof) >> newLine)
+      liftIO $ putStrLn "Checking proof." >> print (showProto prf) >> newLine
       res <- liftIO $ flip runSqlPersistMPool pool $ do
         let uid'          = getField $ uid     (prf :: LocnProof)
             unonce'       = getField $ unonce  (prf :: LocnProof)
             apid'         = getField $ apid    (prf :: LocnProof)
             apnonce'      = getField $ apnonce (prf :: LocnProof)
             (Fixed time') = getField $ time    (prf :: LocnProof)
-        getBy (MessageID uid' unonce' apid' apnonce' (fromIntegral time'))
+        pubKey <- getBy (PublicKeyID apid')
+        case pubKey of
+          Nothing -> return Nothing
+          Just _ -> getBy (MessageID uid' unonce' apid' apnonce' (fromIntegral time'))
       case res of
         -- Not a 404 because that leaks information
         Nothing -> throwError (err400 {errBody = "Invalid proof."})
@@ -109,14 +113,12 @@ server pool = checkProof
               apnonce'      = getField $ apnonce (msg :: VaultMsg)
               (Fixed time') = getField $ time    (msg :: VaultMsg)
           insertBy (Message vault' uid' unonce' apid' apnonce' (fromIntegral time'))
-        -- putStrLn "Received message." >> print msg >> newLine
-        -- case res of
-        --   Left _  -> putStrLn "WARNING: Duplicate exists, did not write."
-        --   Right _ -> return ()
-        return (VaultResp $ "Success!")
+        putStrLn "Received message: " >> print (showProto msg) >> newLine
+        case res of
+          Left _  -> putStrLn "WARNING: Duplicate exists, did not write."
+          Right _ -> return ()
+        return (VaultResp "Success!")
 
--- A valid SignedLocnProof that has this as the payload is:
---
 proof :: LocnProof
 proof = LocnProof
   { vault_key = putField "123"

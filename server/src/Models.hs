@@ -26,4 +26,8 @@ Message
   time Int
   MessageID uid unonce apid apnonce time
   deriving Eq Read Show
+PublicKey
+  value ByteString
+  PublicKeyID value
+  deriving Eq Read Show
 |]
