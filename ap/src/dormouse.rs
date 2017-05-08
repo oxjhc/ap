@@ -31,16 +31,19 @@ use self::get_if_addrs::{get_if_addrs as ifaces, IfAddr};
 use messages::{SignedProofReq,
                ProofResp, SignedProofResp,
                VaultMsg, SignedVaultMsg,
-               LocnProof, SignedLocnProof};
+               LocnProof, SignedLocnProof,
+               SignedToken};
 use vault::make_vault;
 use crypto::PubKey;
 use config::Config;
+use error::Error;
 
 static mut SEQID: i64 = 0;
 
 pub struct Dormouse {
   prflock: Mutex<Option<LocnProof>>,
   vidlock: Mutex<Option<Vec<u8>>>,
+  taglock: Mutex<Vec<u8>>,
   pub cfg: Config
 }
 
@@ -48,12 +51,13 @@ impl Dormouse {
   pub fn new() -> Dormouse {
     let prflock = Mutex::new(None);
     let vidlock = Mutex::new(None);
+    let taglock = Mutex::new(vec![0; 10]);;
     let cfg = Config::new().unwrap();
 
     Dormouse::spawn_pinger(cfg.ping_port);
 
     //printhex!(cfg.key.pub_to_der().unwrap());
-    Dormouse{prflock, vidlock, cfg}
+    Dormouse{prflock, vidlock, taglock, cfg}
   }
 
   fn ping(sock: &UdpSocket, addr: String) {
@@ -151,7 +155,13 @@ impl Dormouse {
     prf.set_ekey(pubekey.pub_to_der().unwrap());
     prf.set_time(time);
 
-    let sig = self.cfg.key.sign(MD::sha256(), p2b!(prf)).unwrap();
+    let locn_tag = self.taglock.lock().unwrap();
+    println!("locn_tag: {:?}", *locn_tag);
+    let mut to_sign = Vec::with_capacity(20);
+    for x in locn_tag.iter() {
+      to_sign.push(0); to_sign.push(*x);
+    }
+    let sig = self.cfg.key.sign(MD::sha256(), to_sign.as_slice()).unwrap();
     let mut sgn_prf = SignedLocnProof::new();
     sgn_prf.set_locnproof(prf.clone());
 		sgn_prf.set_sig(sig);
@@ -172,7 +182,13 @@ impl Dormouse {
 
     if resp.status == hyper::Ok {
       println!("vault successfully sent, response:");
-      println!("{:?}", resp);
+      let sgn_tok : SignedToken = protobuf::parse_from_reader(&mut resp).unwrap();
+      print!("token:\n\t");
+      printhex!(sgn_tok.get_token().get_vnonce());
+      print!("locn_tag hex:\n\t");
+      printhex!(to_sign);
+      print!("received locn_tag hex:\n\t");
+      printhex!(sgn_tok.get_token().get_locn_tag());
       // done.
     } else {
       println!("error sending vault: {}", resp.status);
@@ -182,11 +198,13 @@ impl Dormouse {
     }
   }
 
-  fn gen_proof(&self, uid: &[u8], unonce: &[u8], nonce: &[u8], time: u64) -> Result<Vec<u8>, String> {
+  fn gen_proof(&self, uid: &[u8], unonce: &[u8], nonce: &[u8], time: u64) -> Result<Vec<u8>, Error> {
     println!("starting gen_proof");
-    let locn_tag = vec![ 243, 122, 33, 214 ];
+    let mut locn_tag = self.taglock.lock().unwrap();
+    let rand = rand::SystemRandom::new();
+    rand.fill(locn_tag.as_mut_slice())?;
     let key_sz = 10;
-    let (vault, vault_key) = make_vault(locn_tag, key_sz, 100);
+    let (vault, vault_key) = make_vault(locn_tag.as_slice(), key_sz, 100);
 
     let mut msg = VaultMsg::new();
     msg.set_vault(vault);
@@ -212,7 +230,7 @@ impl Dormouse {
         Ok(res) => res,
         Err(err) => {
           println!("Error sending vault to server: {}", err);
-          return Err("Couldn't send vault to server".to_string());
+          return Err(From::from(err));
         }
       };
 

@@ -48,6 +48,21 @@ impl GF {
   pub fn new8(val: u8) -> GF {
     GF(val as u32 % FIELD_SZ)
   }
+
+  pub fn pow(self, exp: u32) -> GF {
+    let mut e = exp;
+    let mut base = self;
+    let mut res = GF::new(1);
+    while e > 0 {
+      while e & 1 == 0 {
+        e /= 2;
+        base = base*base % FIELD_SZ;
+      }
+      e -= 1;
+      res = res*base % FIELD_SZ;
+    }
+    res
+  }
 }
 
 impl Sub for GF {
