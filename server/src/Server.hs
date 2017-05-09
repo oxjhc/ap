@@ -123,7 +123,7 @@ server pool = checkProof
             Left _  -> liftIO $ putStrLn "WARNING: Duplicate exists, did not write."
             Right _ -> return ()
           return (VaultResp "Success!")
-        Nothing -> throwError (err400 {errBody = "Invalud vault message."})
+        Nothing -> throwError (err400 {errBody = "Invalid vault message."})
 
 proof :: LocnProof
 proof = LocnProof
