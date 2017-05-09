@@ -6,7 +6,6 @@ mod util;
 mod error;
 mod config;
 mod pinger;
-mod p2pctrl;
 mod dormouse;
 mod vault;
 mod messages;

@@ -8,8 +8,7 @@ use std::mem::transmute;
 use self::ring::rand;
 use self::ring::rand::SecureRandom;
 
-use self::get_if_addrs::{get_if_addrs as ifaces, IfAddr};
-
+use util::p2p_iface_braddr;
 use error::Error;
 
 static mut SEQID: i64 = 0;
@@ -24,18 +23,18 @@ impl Pinger {
       let rand = rand::SystemRandom::new();
       loop {
         thread::sleep(time::Duration::from_millis(300));
-        for iface in ifaces().unwrap() {
-          if iface.name.starts_with("p2p") {
-            match iface.addr {
-              IfAddr::V4(addr) => match addr.broadcast {
-                Some(brip) => {
-                  unsafe { rand.fill(transmute::<&mut i64, &mut [u8;8]>(&mut SEQID)).unwrap(); };
-                  Pinger::ping(&sock, format!("{}:{}", brip, port));
-                },
-                _ => unsafe { SEQID = 0; }
+        match p2p_iface_braddr() {
+          Ok(braddr) =>
+            match braddr {
+              Some(brip) => {
+                unsafe { rand.fill(transmute::<&mut i64, &mut [u8;8]>(&mut SEQID)).unwrap(); };
+                Pinger::ping(&sock, format!("{}:{}", brip, port));
               },
               _ => unsafe { SEQID = 0; }
-            }
+            },
+          Err(err) => {
+            println!("Error getting interfaces: {}", err);
+            unsafe { SEQID = 0; }
           }
         }
       }

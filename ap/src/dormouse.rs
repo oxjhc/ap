@@ -5,6 +5,7 @@ extern crate base64;
 use std::time;
 use std::sync::Mutex;
 use std::io::Read;
+use std::process::Command;
 
 use self::hyper::server::{Handler, Request, Response};
 use self::hyper::client::Client;
@@ -15,6 +16,7 @@ use self::hyper::header;
 use protobuf;
 use protobuf::Message;
 
+use util::p2p_iface_name;
 use messages::{SignedProofReq,
                ProofResp, SignedProofResp,
                VaultMsg, SignedVaultMsg,
@@ -25,7 +27,6 @@ use crypto::{PubKey, EphKey, gen_nonce};
 use config::Config;
 use error::Error;
 use pinger::Pinger;
-use p2pctrl::P2pCtrl;
 
 pub struct Dormouse {
   prflock: Mutex<Option<LocnProof>>,
@@ -41,7 +42,6 @@ impl Dormouse {
     let cfg = Config::new().unwrap();
 
     let pinger = Pinger::new(cfg.ping_port).unwrap();
-    let p2pctrl = P2pCtrl::new(&cfg.wpa_ctrl_path, &cfg.name);
 
     //printhex!(cfg.key.pub_to_der().unwrap());
     Dormouse{prflock, vidlock, pinger, cfg}
@@ -227,7 +227,8 @@ impl Handler for Dormouse {
           };
           let mut prf_req = sgn_prf_req.take_proofreq();
 
-          if prf_req.get_seqid() != self.pinger.get_seqid() {
+          let cur_seq = self.pinger.get_seqid();
+          if prf_req.get_seqid() != cur_seq && cur_seq != 0 {
             reply!(StatusCode::Unauthorized, b"The sequence id sent is too old");
             return;
           }
@@ -315,6 +316,30 @@ impl Handler for Dormouse {
             reply!(StatusCode::Ok, p2b!(sgn_prf));
           }
 
+          match p2p_iface_name() {
+            Ok(i) => match i {
+              Some(i) => {
+                match Command::new("wpa_cli")
+                  .arg("p2p_group_remove")
+                  .arg(i).output() {
+                    Ok(_) => {},
+                    Err(err) => {
+                      println!("Failed to remove group: {}", err);
+                    }
+                  };
+                match Command::new("wpa_cli")
+                  .arg("p2p_listen")
+                  .output() {
+                    Ok(_) => {},
+                    Err(err) => {
+                      println!("Failed to start listening on p2p: {}", err);
+                    }
+                  };
+              },
+              _ => {}
+            },
+            _ => {}
+          };
           *prfg = None;
         },
         _ => {

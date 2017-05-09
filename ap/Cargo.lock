@@ -11,7 +11,6 @@ dependencies = [
  "ring 0.9.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "toml 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "untrusted 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "wpactrl 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -344,15 +343,6 @@ name = "winapi-build"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
-[[package]]
-name = "wpactrl"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-dependencies = [
- "gcc 0.3.45 (registry+https://github.com/rust-lang/crates.io-index)",
- "libc 0.2.22 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
 [metadata]
 "checksum base64 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)" = "30e93c03064e7590d0466209155251b90c22e37fab1daf2771582598b5827557"
 "checksum bitflags 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)" = "1370e9fc2a6ae53aea8b7a5110edbd08836ed87c88736dfabccade1c2b44bff4"
@@ -400,4 +390,3 @@ dependencies = [
 "checksum user32-sys 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)" = "4ef4711d107b21b410a3a974b1204d9accc8b10dad75d8324b5d755de1617d47"
 "checksum winapi 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)" = "167dc9d6949a9b857f3451275e911c3f44255842c1f7a76f33c55103a909087a"
 "checksum winapi-build 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "2d315eee3b34aca4797b2da6b13ed88266e6d612562a0c46390af8299fc699bc"
-"checksum wpactrl 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)" = "d798afa8ba83d97ae436d92ac15aa015554dde0d3a971ef127826263989079b8"
