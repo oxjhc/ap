@@ -330,15 +330,19 @@ impl Handler for Dormouse {
                 match Command::new("wpa_cli")
                   .arg("p2p_listen")
                   .output() {
-                    Ok(_) => {},
+                    Ok(o) => {},
                     Err(err) => {
                       println!("Failed to start listening on p2p: {}", err);
                     }
                   };
               },
-              _ => {}
+              _ => {
+                println!("No p2p interface");
+              }
             },
-            _ => {}
+            _ => {
+              println!("Failed to get interfaces");
+            }
           };
           *prfg = None;
         },
