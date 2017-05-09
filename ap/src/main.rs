@@ -42,13 +42,13 @@ fn main() {
     .arg("uuid:Dormouse::urn:schemas-oxjhc-club:service:TeaParty:1")
     .output().unwrap();
   println!("done.");
-  println!("stdout: {}", String::from_utf8(out.stdout).unwrap());
-  println!("stderr: {}", String::from_utf8(out.stderr).unwrap());
+  //println!("stdout: {}", String::from_utf8(out.stdout).unwrap());
+  //println!("stderr: {}", String::from_utf8(out.stderr).unwrap());
   print!("starting p2p listen... ");
   let out = Command::new("wpa_cli").arg("p2p_listen").output().unwrap();
   println!("done.");
-  println!("stdout: {}", String::from_utf8(out.stdout).unwrap());
-  println!("stderr: {}", String::from_utf8(out.stderr).unwrap());
+  //println!("stdout: {}", String::from_utf8(out.stdout).unwrap());
+  //println!("stderr: {}", String::from_utf8(out.stderr).unwrap());
 
   print!("spawning p2p controller... ");
   // TODO: use tempfile
