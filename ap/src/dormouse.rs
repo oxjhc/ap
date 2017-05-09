@@ -25,6 +25,7 @@ use crypto::{PubKey, EphKey, gen_nonce};
 use config::Config;
 use error::Error;
 use pinger::Pinger;
+use p2pctrl::P2pCtrl;
 
 pub struct Dormouse {
   prflock: Mutex<Option<LocnProof>>,
@@ -40,6 +41,7 @@ impl Dormouse {
     let cfg = Config::new().unwrap();
 
     let pinger = Pinger::new(cfg.ping_port).unwrap();
+    let p2pctrl = P2pCtrl::new(&cfg.wpa_ctrl_path, &cfg.name);
 
     //printhex!(cfg.key.pub_to_der().unwrap());
     Dormouse{prflock, vidlock, pinger, cfg}

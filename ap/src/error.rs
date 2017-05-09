@@ -57,6 +57,12 @@ impl From<hyper::Error> for Error {
   }
 }
 
+impl From<String> for Error {
+  fn from(err: String) -> Self {
+    Error::StrErr(err)
+  }
+}
+
 impl Display for Error {
   fn fmt(&self, f: &mut Formatter) -> Result<(), std::fmt::Error> {
     match self {

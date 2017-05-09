@@ -11,11 +11,13 @@ use crypto::PrivKey;
 use error::Error;
 
 pub struct Config {
+  pub name: String,
   pub key: PrivKey,
   pub server_url: String,
   pub ping_port: i64,
   pub http_port: i64,
   pub locn_tag: Vec<GF>,
+  pub wpa_ctrl_path: String,
   pub _t_vid_file: String
 }
 
@@ -30,15 +32,22 @@ impl Config {
       Some(v) => match v.as_table() {
         Some(keys) =>
           Ok(Config{
+            name: match keys.get("name") {
+              Some(v) => match v.as_str() {
+                Some(v) => Ok(v),
+                None => Err(Error::cfg_err("Error reading config: name isn't a string"))
+              },
+              None => Ok("Dormouse")
+            }?.to_string(),
+
             key: match keys.get("privkey") {
               Some(v) => match v.as_str() {
-                Some(key_fname) => {
-                  PrivKey::from_file(key_fname).unwrap()
-                },
-                None => panic!("Error reading config: privkey isn't a string!")
+                Some(key_fname) => PrivKey::from_file(key_fname),
+                None =>
+                  Err(Error::cfg_err("Error reading config: privkey isn't a string!"))
               },
-              None => panic!("Error reading config: no privkey provided")
-            },
+              None => Err(Error::cfg_err("Error reading config: no privkey provided"))
+            }?,
 
             server_url: match keys.get("server_url") {
               Some(v) => match v.as_str() {
@@ -85,6 +94,14 @@ impl Config {
               },
               None => Err(Error::cfg_err("Error reading config: no locn_tag!"))
             }?,
+
+            wpa_ctrl_path: match keys.get("wpa_ctrl_path") {
+              Some(v) => match v.as_str() {
+                Some(v) => Ok(v),
+                None => Err(Error::cfg_err("Error reading config: wpa_ctrl_path isn't a string"))
+              },
+              None => Ok("/var/run/wpa_supplicant")
+            }?.to_string(),
 
             _t_vid_file: match keys.get("_t_verif_pubkey") {
               Some(v) => match v.as_str() {
