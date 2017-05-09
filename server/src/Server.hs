@@ -8,65 +8,130 @@
 
 module Server where
 
+import           Control.Monad             (guard)
 import           Control.Monad.IO.Class
+import           Control.Monad.Logger      (runStderrLoggingT)
+import           Data.Binary.Builder.Sized
+import           Data.Binary.Get           (runGetOrFail)
+import           Data.ByteString           (ByteString)
+import           Data.ByteString.Lazy      (fromStrict, toStrict)
 import           Data.ProtocolBuffers
-import           Network.Wai
+import           Data.String.Conversions
+import           Database.Persist
+import           Database.Persist.Sql
+import           Database.Persist.Sqlite
+import           Network.Wai               hiding (vault)
 import           Network.Wai.Handler.Warp
+import           Network.Wai.Logger
+import           Servant                   hiding (Vault)
+
+import           Cryptography
+import           Models
 import           ProtoBuf
-import           Servant                  hiding (Vault)
+import           Verification
 
 newtype VaultResp = VaultResp String deriving (Eq, Show, MimeRender PlainText)
 newtype PingResp = PingResp String deriving (Eq, Show, MimeRender PlainText)
 
 type ServerAPI =
-       -- Get a LocnProof and check if it is valid, and if so return Token.
-       "proof" :> ReqBody '[ProtoBuf] LocnProof :> Post '[ProtoBuf] Token
-       -- Receive a VaultMsg, printing it out for now.
-  :<|> "vault" :> ReqBody '[ProtoBuf] VaultMsg :> Post '[PlainText] VaultResp
+       -- Get a SignedLocnProof and check if it is valid, and if so return SignedToken.
+       "proof" :> ReqBody '[ProtoBuf] SignedLocnProof :> Post '[ProtoBuf] SignedToken
+       -- Receive a SignedVaultMsg, printing it out for now.
+  :<|> "vault" :> ReqBody '[ProtoBuf] SignedVaultMsg :> Post '[PlainText] VaultResp
        -- Sanity check that the server is running.
   :<|> "ping" :> Get '[PlainText] PingResp
 
-startApp :: IO ()
-startApp = run 8080 app
+startApp :: FilePath -> IO ()
+startApp sqliteFile = do
+  withStdoutLogger $ \aplogger -> do
+    let settings = setPort 80 $ setLogger aplogger defaultSettings
+    runSettings settings =<< makeApp sqliteFile
 
-app :: Application
-app = serve api server
+makeApp :: FilePath -> IO Application
+makeApp sqliteFile = do
+  pool <- runStderrLoggingT $
+    createSqlitePool (cs sqliteFile) 5
+
+  runSqlPool (runMigration migrateAll) pool
+  return $ app pool
+
+app :: ConnectionPool -> Application
+app pool = serve api $ server pool
 
 api :: Proxy ServerAPI
 api = Proxy
 
-server :: Server ServerAPI
-server = checkProof
+server :: ConnectionPool -> Server ServerAPI
+server pool = checkProof
     :<|> receiveVaultMsg
     :<|> return (PingResp "Success!")
   where
     newLine = putStr "\n"
-    checkProof :: LocnProof -> Handler Token
-    checkProof prf = do
-      liftIO (putStrLn "Checking proof." >> print prf >> newLine)
-      if prf == proof then
-        return token
-      else
-        throwError (err400 {errBody = "Invalid proof."})
-    receiveVaultMsg :: VaultMsg -> Handler VaultResp
-    receiveVaultMsg msg = do
-      liftIO (putStrLn "Received message." >> print msg >> newLine)
-      return (VaultResp $ show msg)
+    -- Function to check proof
 
--- Serializes to: "0A060000000100021204313233341A01782204353637382A01793140000000000000003A026D65"
+    checkProof :: SignedLocnProof -> Handler SignedToken
+    checkProof signedProof = do
+      let prf  = getField $ locnproof signedProof
+      liftIO $ putStrLn "Checking proof." >> print (showProto prf) >> newLine
+      res <- liftIO $ flip runSqlPersistMPool pool $ do
+        let uid'          = getField $ uid     (prf :: LocnProof)
+            unonce'       = getField $ unonce  (prf :: LocnProof)
+            apid'         = getField $ apid    (prf :: LocnProof)
+            apnonce'      = getField $ apnonce (prf :: LocnProof)
+            (Fixed time') = getField $ time    (prf :: LocnProof)
+        pubKey <- getBy (PublicKeyID apid')
+        case pubKey of
+          Nothing -> return Nothing
+          Just _ -> getBy (MessageID uid' unonce' apid' apnonce' (fromIntegral time'))
+      case res of
+        -- Not a 404 because that leaks information
+        Nothing -> throwError (err400 {errBody = "Invalid proof."})
+        Just blob -> case runGetOrFail decodeMessage . fromStrict .
+                          messageVault . entityVal $ blob of
+          Left (_, _, err)    -> throwError (err400 {errBody = "Corrupt."})
+          Right (_, _, vault) -> do
+            liftIO $ putStrLn "Got corresponding vault, checking validity."
+            let signature = getField $ sig (signedProof :: SignedLocnProof)
+            proofResult <- liftIO $ valid prf (convertVault vault) (fromStrict signature)
+            case proofResult of
+              Just locnTag -> liftIO $ genSignedToken locnTag
+              Nothing      -> throwError (err400 {errBody = "Invalid proof."})
+
+    receiveVaultMsg :: SignedVaultMsg -> Handler VaultResp
+    receiveVaultMsg signedMsg = do
+      let msg = getField . vault_msg $ signedMsg
+      liftIO $ putStrLn "Received message: " >> print (showProto msg) >> newLine
+      if not $ checkVaultSignature msg $ fromStrict $ getField $ sig (signedMsg :: SignedVaultMsg)
+        then throwError (err400 {errBody = "Invalud vault message."})
+        else return ()
+      res <- liftIO $ do
+        flip runSqlPersistMPool pool $ do
+          let vault'        = toStrict . toLazyByteString . encodeMessage $
+                                (getField . vault $ msg)
+              uid'          = getField $ uid     (msg :: VaultMsg)
+              unonce'       = getField $ unonce  (msg :: VaultMsg)
+              apid'         = getField $ apid    (msg :: VaultMsg)
+              apnonce'      = getField $ apnonce (msg :: VaultMsg)
+              (Fixed time') = getField $ time    (msg :: VaultMsg)
+          pubKey <- getBy (PublicKeyID apid')
+          case pubKey of
+            Nothing -> return Nothing
+            Just _ -> Just <$> insertBy (Message vault' uid' unonce' apid' apnonce' (fromIntegral time'))
+      case res of
+        Just e -> do
+          case e of
+            Left _  -> liftIO $ putStrLn "WARNING: Duplicate exists, did not write."
+            Right _ -> return ()
+          return (VaultResp "Success!")
+        Nothing -> throwError (err400 {errBody = "Invalid vault message."})
+
 proof :: LocnProof
 proof = LocnProof
-  { vault_key = [0,1,2]
-  , uid = "1234"
-  , unonce = "x"
-  , apid = "5678"
-  , apnonce = "y"
-  , time = 64
-  , sig = "me"
-  }
-
-token :: Token
-token = Token
-  { vnonce = "abcd"
-  , locn_tag = 0
+  { vault_key = putField "123"
+  , ekey = putField "abc"
+  , uid = putField "1234"
+  , unonce = putField "x"
+  , apid = putField "5678"
+  , apnonce = putField "y"
+  , time = putField 64
   }

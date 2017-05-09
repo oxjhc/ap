@@ -5,3 +5,6 @@
 
 # Stack tool hidden directory
 .stack-work/
+
+# Ignore database
+*.db

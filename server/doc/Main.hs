@@ -1,5 +1,6 @@
 {-# LANGUAGE AllowAmbiguousTypes   #-}
 {-# LANGUAGE DataKinds             #-}
+{-# LANGUAGE DuplicateRecordFields #-}
 {-# LANGUAGE FlexibleContexts      #-}
 {-# LANGUAGE FlexibleInstances     #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -15,36 +16,70 @@ import           Data.Monoid          ((<>))
 import           Data.ProtocolBuffers
 import           Data.Proxy
 import           Data.Text            (Text, pack)
-import           ProtoBuf             (LocnProof, LocnProof', Point, ProtoBuf,
-                                       Token, Token', Vault', VaultMsg (..),
-                                       VaultMsg')
-import           ProtoBufConverter
+import           ProtoBuf
 import           Servant
 import           Servant.Docs
-import           Server
+import           Server               hiding (proof, token)
 import           Vault                (Vault (..))
 
 
-vaultMsg :: VaultMsg
-vaultMsg = VaultMsg
-  { vault = Vault [(1,2), (3,4)]
-  , uid = "1234"
-  , unonce = "x"
-  , apid = "5678"
-  , apnonce = "y"
-  , time = 64
-  , sig = "me"
+proof :: LocnProof
+proof = LocnProof
+  { vault_key = putField "123"
+  , ekey = putField "abc"
+  , uid = putField "1234"
+  , unonce = putField "x"
+  , apid = putField "5678"
+  , apnonce = putField "y"
+  , time = putField 64
   }
 
+signedProof :: SignedLocnProof
+signedProof = SignedLocnProof
+  { locnproof = putField proof
+  , sig = putField "0"
+  }
 
-instance ToSample LocnProof where
-  toSamples _ = singleSample proof
+token :: Token
+token = Token
+  { vnonce = putField "abcd"
+  , locn_tag = putField "0"
+  }
 
-instance ToSample Token where
-  toSamples _ = singleSample token
+signedToken :: SignedToken
+signedToken = SignedToken
+  { token = putField Main.token
+  , sig = putField "0"
+  }
 
-instance ToSample VaultMsg where
-  toSamples _ = singleSample vaultMsg
+vaultMsg :: VaultMsg
+vaultMsg = VaultMsg
+  { vault = putField vault
+  , uid = putField "1234"
+  , unonce = putField "x"
+  , apid = putField "5678"
+  , apnonce = putField "y"
+  , time = putField 64
+  }
+  where
+    vault = ProtoBuf.Vault {points = putField [p1, p2]}
+    p1 = Point {x = putField 1, y = putField 2}
+    p2 = Point {x = putField 3, y = putField 4}
+
+signedVaultMsg :: SignedVaultMsg
+signedVaultMsg = SignedVaultMsg
+  { vault_msg = putField vaultMsg
+  , sig = putField "0"
+  }
+
+instance ToSample SignedLocnProof where
+  toSamples _ = singleSample signedProof
+
+instance ToSample SignedToken where
+  toSamples _ = singleSample signedToken
+
+instance ToSample SignedVaultMsg where
+  toSamples _ = singleSample signedVaultMsg
 
 instance ToSample VaultResp where
   toSamples _ = singleSample (VaultResp (show vaultMsg))
@@ -54,24 +89,27 @@ instance ToSample PingResp where
 
 
 proofInfo :: ExtraInfo ServerAPI
-proofInfo = extraInfo (Proxy :: Proxy ("proof" :> ReqBody '[ProtoBuf] LocnProof :> Post '[ProtoBuf] Token)) $
+proofInfo = extraInfo (Proxy :: Proxy ("proof" :> ReqBody '[ProtoBuf] SignedLocnProof :> Post '[ProtoBuf] SignedToken)) $
   defAction & notes <>~
     [ DocNote "Relevant Schemas"
-      [ "LocnProof is the protobuf in the request body and follows:\n\n```\n" ++
-        show (schemaProto @LocnProof') ++ "\n```"
-      , "Token is the protobuf in the response and follows:\n\n```\n" ++
-        show (schemaProto @Token') ++ "\n```"
+      [ "SignedLocnProof is the protobuf in the request body and follows:\n\n```\n" ++
+        show (schemaProto @SignedLocnProof) ++ "\n```\n\n```\n" ++
+        show (schemaProto @LocnProof) ++ "\n```"
+      , "SignedToken is the protobuf in the response and follows:\n\n```\n" ++
+        show (schemaProto @SignedToken) ++ "\n```\n\n```\n" ++
+        show (schemaProto @Token) ++ "\n```"
       ]
     ]
 
 vaultInfo :: ExtraInfo ServerAPI
-vaultInfo = extraInfo (Proxy :: Proxy ("vault" :> ReqBody '[ProtoBuf] VaultMsg :> Post '[PlainText] VaultResp)) $
+vaultInfo = extraInfo (Proxy :: Proxy ("vault" :> ReqBody '[ProtoBuf] SignedVaultMsg :> Post '[PlainText] VaultResp)) $
   defAction & notes <>~
     [ DocNote "Relevant Schemas"
-      [ "VaultMsg is the protobuf in the request body and follows:\n\n```\n" ++
-        show (schemaProto @VaultMsg') ++ "\n```\n\n```\n" ++
-        show (schemaProto @Vault') ++ "\n```" -- \n\n```\n" ++
-        -- show (schemaProto @Point) ++ "\n```"
+      [ "SignedVaultMsg is the protobuf in the request body and follows:\n\n```\n" ++
+        show (schemaProto @SignedVaultMsg) ++ "\n```\n\n```\n" ++
+        show (schemaProto @VaultMsg) ++ "\n```\n\n```\n" ++
+        show (schemaProto @ProtoBuf.Vault) ++ "\n```\n\n```\n" ++
+        show (schemaProto @Point) ++ "\n```"
       ]
     ]
 
