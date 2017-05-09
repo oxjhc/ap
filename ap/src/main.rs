@@ -26,9 +26,9 @@ fn main() {
     }
   }
 
-  print!("restarting wpa_supplicant... ");
-  Command::new("systemctl").arg("restart").arg("wpa_supplicant-nl80211@wlan0").output().unwrap();
-  println!("done");
+  //print!("restarting wpa_supplicant... ");
+  //Command::new("systemctl").arg("restart").arg("wpa_supplicant-nl80211@wlan0").output().unwrap();
+  //println!("done");
   print!("flushing p2p state... ");
   let out = Command::new("wpa_cli").arg("p2p_flush").output().unwrap();
   println!("done.");
