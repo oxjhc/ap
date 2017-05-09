@@ -2,7 +2,7 @@ extern crate hyper;
 extern crate ring;
 extern crate base64;
 
-use std::time;
+use std::{thread, time};
 use std::sync::Mutex;
 use std::io::Read;
 use std::process::Command;
