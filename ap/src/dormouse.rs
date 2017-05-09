@@ -333,7 +333,7 @@ impl Handler for Dormouse {
                       println!("FAIL\nError: {}", err);
                     }
                   };
-                print!("starting p2p listen... ")
+                print!("starting p2p listen... ");
                 match Command::new("wpa_cli")
                   .arg("p2p_listen")
                   .arg("-i")
