@@ -333,6 +333,8 @@ impl Handler for Dormouse {
                 thread::sleep(time::Duration::from_millis(100));
                 match Command::new("wpa_cli")
                   .arg("p2p_listen")
+                  .arg("-i")
+                  .arg("p2p-dev-wlan0")
                   .output() {
                     Ok(o) => {
                       println!("p2p listen output:\n{}", String::from_utf8(o.stdout).unwrap())
