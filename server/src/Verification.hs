@@ -26,31 +26,33 @@ import           Data.Hex
 import           Data.ProtocolBuffers
 import           Data.Serialize.Get
 import           Data.Serialize.Put        (runPut)
+import           Debug.Trace
 
 import           Cryptography
 import           Number
 import           ProtoBuf                  hiding (Vault)
 import           Vault
 
+traceShowTag :: forall a. Show a => String -> a -> a
+traceShowTag tag x = trace (tag ++ ": " ++ show x) x
 
 valid :: LocnProof -> Vault PrimeField -> LBS.ByteString -> IO (Maybe (Polynomial PrimeField))
 valid m3 vault sig' = do
   vPrivKey <- getPrivKey
-  let key' = getField $ vault_key m3
-      apn = getField $ apnonce (m3 :: LocnProof)
-      eKey' = LBS.fromStrict $ getField $ ekey (m3 :: LocnProof)
-      eKey = either (const Nothing) Just $ parsePubKeyLax eKey'
-      apKey' = LBS.fromStrict $ getField $ apid (m3 :: LocnProof)
-      apKey = either (const Nothing) Just $ parsePubKeyLax apKey'
-      a = maybe undefined id apKey
+  let key' = traceShowTag "key'" $ getField $ vault_key m3
+      apn = traceShowTag "apn" $ getField $ apnonce (m3 :: LocnProof)
+      eKey' = traceShowTag "ekey'" $ LBS.fromStrict $ getField $ ekey (m3 :: LocnProof)
+      eKey = traceShowTag "ekey" $ either (const Nothing) Just $ parsePubKeyLax eKey'
+      apKey' = traceShowTag "apKey'" $ LBS.fromStrict $ getField $ apid (m3 :: LocnProof)
+      apKey = traceShowTag "apkey" $ either (const Nothing) Just $ parsePubKeyLax apKey'
   let key = do
         ak <- eKey
-        dec <- maybeCryptoError $ decrypt apn ak vPrivKey key'
-        return (decodeVaultKey dec)
-      locnTag = openVault vault <$> key
-      hLocnTagM3 = encodePFs <$> unPoly <$> locnTag
-      storedSig = either (const Nothing) Just $ parseSig sig'
-  if maybe False id $ verify SHA256 <$> apKey <*> storedSig <*> hLocnTagM3
+        dec <- maybeCryptoError $ traceShowTag "decrypt" $ decrypt apn ak vPrivKey key'
+        return (traceShowTag "decodeVaultKey" $ decodeVaultKey dec)
+      locnTag = traceShowTag " locnTag" $ openVault vault <$> key
+      hLocnTagM3 = traceShowTag "hLocnTagM3" $ encodePFs <$> unPoly <$> locnTag
+      storedSig = traceShowTag "storedSig" $ either (const Nothing) Just $ parseSig sig'
+  if maybe False id $ traceShowTag "verify" $ verify SHA256 <$> apKey <*> storedSig <*> hLocnTagM3
       then return locnTag
       else return Nothing
 

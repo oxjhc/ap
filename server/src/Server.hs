@@ -100,11 +100,12 @@ server pool = checkProof
     receiveVaultMsg :: SignedVaultMsg -> Handler VaultResp
     receiveVaultMsg signedMsg = do
       let msg = getField . vault_msg $ signedMsg
+      liftIO $ putStrLn "Received message: " >> print (showProto msg) >> newLine
       if not $ checkVaultSignature msg $ fromStrict $ getField $ sig (signedMsg :: SignedVaultMsg)
-        then throwError (err400 {errBody = "Invalud signature."})
+        then throwError (err400 {errBody = "Invalud vault message."})
         else return ()
-      liftIO $ do
-        res <- flip runSqlPersistMPool pool $ do
+      res <- liftIO $ do
+        flip runSqlPersistMPool pool $ do
           let vault'        = toStrict . toLazyByteString . encodeMessage $
                                 (getField . vault $ msg)
               uid'          = getField $ uid     (msg :: VaultMsg)
@@ -112,12 +113,17 @@ server pool = checkProof
               apid'         = getField $ apid    (msg :: VaultMsg)
               apnonce'      = getField $ apnonce (msg :: VaultMsg)
               (Fixed time') = getField $ time    (msg :: VaultMsg)
-          insertBy (Message vault' uid' unonce' apid' apnonce' (fromIntegral time'))
-        putStrLn "Received message: " >> print (showProto msg) >> newLine
-        case res of
-          Left _  -> putStrLn "WARNING: Duplicate exists, did not write."
-          Right _ -> return ()
-        return (VaultResp "Success!")
+          pubKey <- getBy (PublicKeyID apid')
+          case pubKey of
+            Nothing -> return Nothing
+            Just _ -> Just <$> insertBy (Message vault' uid' unonce' apid' apnonce' (fromIntegral time'))
+      case res of
+        Just e -> do
+          case e of
+            Left _  -> liftIO $ putStrLn "WARNING: Duplicate exists, did not write."
+            Right _ -> return ()
+          return (VaultResp "Success!")
+        Nothing -> throwError (err400 {errBody = "Invalud vault message."})
 
 proof :: LocnProof
 proof = LocnProof
