@@ -330,6 +330,7 @@ impl Handler for Dormouse {
                       println!("Failed to remove group: {}", err);
                     }
                   };
+                thread::sleep(time::Duration::from_millis(100));
                 match Command::new("wpa_cli")
                   .arg("p2p_listen")
                   .output() {
