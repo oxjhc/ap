@@ -320,27 +320,30 @@ impl Handler for Dormouse {
           match p2p_iface_name() {
             Ok(i) => match i {
               Some(i) => {
+                print!("removing interface {}... ", &i);
                 match Command::new("wpa_cli")
                   .arg("p2p_group_remove")
+                  .arg(&i)
+                  .arg("-i")
                   .arg(i).output() {
                     Ok(o) => {
-                      println!("group remove output:\n{}", String::from_utf8(o.stdout).unwrap())
+                      println!("{}", String::from_utf8(o.stdout).unwrap())
                     },
                     Err(err) => {
-                      println!("Failed to remove group: {}", err);
+                      println!("FAIL\nError: {}", err);
                     }
                   };
-                thread::sleep(time::Duration::from_millis(100));
+                print!("starting p2p listen... ")
                 match Command::new("wpa_cli")
                   .arg("p2p_listen")
                   .arg("-i")
                   .arg("p2p-dev-wlan0")
                   .output() {
                     Ok(o) => {
-                      println!("p2p listen output:\n{}", String::from_utf8(o.stdout).unwrap())
+                      println!("{}", String::from_utf8(o.stdout).unwrap())
                     },
                     Err(err) => {
-                      println!("Failed to start listening on p2p: {}", err);
+                      println!("FAIL\nError: {}", err);
                     }
                   };
               },

@@ -30,27 +30,24 @@ fn main() {
   //Command::new("systemctl").arg("restart").arg("wpa_supplicant-nl80211@wlan0").output().unwrap();
   //println!("done");
   print!("flushing p2p state... ");
-  let out = Command::new("wpa_cli").arg("p2p_flush").output().unwrap();
-  println!("done.");
-  //println!("stdout: {}", String::from_utf8(out.stdout).unwrap());
+  let out = Command::new("wpa_cli").arg("p2p_flush").arg("-i").arg("p2p-dev-wlan0").output().unwrap();
+  println!("{}", String::from_utf8(out.stdout).unwrap());
   //println!("stderr: {}", String::from_utf8(out.stderr).unwrap());
   print!("flushing p2p services... ");
-  let out = Command::new("wpa_cli").arg("p2p_service_flush").output().unwrap();
-  println!("done.");
-  //println!("stdout: {}", String::from_utf8(out.stdout).unwrap());
+  let out = Command::new("wpa_cli").arg("p2p_service_flush").arg("-i").arg("p2p-dev-wlan0").output().unwrap();
+  println!("{}", String::from_utf8(out.stdout).unwrap());
   //println!("stderr: {}", String::from_utf8(out.stderr).unwrap());
   print!("adding service... ");
   let out = Command::new("wpa_cli")
     .arg("p2p_service_add").arg("upnp").arg("10")
     .arg("uuid:Dormouse::urn:schemas-oxjhc-club:service:TeaParty:1")
+    .arg("-i").arg("p2p-dev-wlan0")
     .output().unwrap();
-  println!("done.");
-  //println!("stdout: {}", String::from_utf8(out.stdout).unwrap());
+  println!("{}", String::from_utf8(out.stdout).unwrap());
   //println!("stderr: {}", String::from_utf8(out.stderr).unwrap());
   print!("starting p2p listen... ");
-  let out = Command::new("wpa_cli").arg("p2p_listen").output().unwrap();
-  println!("done.");
-  //println!("stdout: {}", String::from_utf8(out.stdout).unwrap());
+  let out = Command::new("wpa_cli").arg("p2p_listen").arg("-i").arg("p2p-dev-wlan0").output().unwrap();
+  println!("{}", String::from_utf8(out.stdout).unwrap());
   //println!("stderr: {}", String::from_utf8(out.stderr).unwrap());
 
   print!("spawning p2p controller... ");
