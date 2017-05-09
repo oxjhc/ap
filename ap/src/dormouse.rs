@@ -162,7 +162,8 @@ impl Dormouse {
       };
 
     if resp.status == hyper::Ok {
-      println!("vault successfully sent");
+      println!("vault successfully sent for user:");
+      printhex!(sgn_msg.get_vault_msg().get_uid());
       // done.
     } else {
       println!("error sending vault: {}", resp.status);
@@ -322,7 +323,9 @@ impl Handler for Dormouse {
                 match Command::new("wpa_cli")
                   .arg("p2p_group_remove")
                   .arg(i).output() {
-                    Ok(_) => {},
+                    Ok(o) => {
+                      println!("group remove output:\n{}", String::from_utf8(o.stdout).unwrap())
+                    },
                     Err(err) => {
                       println!("Failed to remove group: {}", err);
                     }
@@ -330,7 +333,9 @@ impl Handler for Dormouse {
                 match Command::new("wpa_cli")
                   .arg("p2p_listen")
                   .output() {
-                    Ok(o) => {},
+                    Ok(o) => {
+                      println!("p2p listen output:\n{}", String::from_utf8(o.stdout).unwrap())
+                    },
                     Err(err) => {
                       println!("Failed to start listening on p2p: {}", err);
                     }
